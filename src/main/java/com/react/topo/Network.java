@@ -1,17 +1,18 @@
 package com.react.topo;
 
-import java.io.IOException;
-import java.util.*;
-
-import com.react.verify.Verify;
-import net.floodlightcontroller.core.*;
+import com.react.compiler.Flow;
+import net.floodlightcontroller.core.IFloodlightProviderService;
+import net.floodlightcontroller.core.IOFSwitch;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
+import net.floodlightcontroller.core.module.FloodlightModuleContext;
+import net.floodlightcontroller.core.module.FloodlightModuleException;
+import net.floodlightcontroller.core.module.IFloodlightModule;
+import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.debugcounter.IDebugCounterService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
 import net.floodlightcontroller.packet.IPv4;
-import net.floodlightcontroller.routing.BroadcastTree;
 import net.floodlightcontroller.routing.IRoutingService;
 import net.floodlightcontroller.routing.Link;
 import net.floodlightcontroller.routing.Route;
@@ -21,20 +22,17 @@ import net.floodlightcontroller.staticflowentry.web.StaticFlowEntryPusherResourc
 import net.floodlightcontroller.storage.IStorageSourceService;
 import net.floodlightcontroller.topology.ITopologyService;
 import net.floodlightcontroller.topology.NodePortTuple;
-import net.floodlightcontroller.topology.TopologyInstance;
-import net.floodlightcontroller.util.MatchUtils;
-import org.projectfloodlight.openflow.protocol.*;
-import org.projectfloodlight.openflow.types.*;
-
-import net.floodlightcontroller.core.module.FloodlightModuleContext;
-import net.floodlightcontroller.core.module.FloodlightModuleException;
-import net.floodlightcontroller.core.module.IFloodlightModule;
-import net.floodlightcontroller.core.module.IFloodlightService;
-
+import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.IPv4Address;
+import org.projectfloodlight.openflow.types.OFPort;
+import org.projectfloodlight.openflow.types.U64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.react.schronized_rpc.Flow;
+import java.io.IOException;
+import java.util.*;
+
+
 
 /**
  * Network is responsible for provide data structure about topology,
@@ -213,7 +211,7 @@ public class Network
             String tmpMask = "32";
             while (index < (paths.size() - 1)) {
                 generateFlow(flow.getSource(), tmpMask,
-                        flow.getDestiantion(), tmpMask,
+                        flow.getDestination(), tmpMask,
                         paths.get(index).getPortId().getPortNumber(),
                         paths.get(index + 1).getPortId().getPortNumber(),
                         paths.get(index).getNodeId(),   //dpid
@@ -225,7 +223,7 @@ public class Network
             index = 0;
             while (index < (paths.size() - 1)) {
                 generateFlow(flow.getSource(), tmpMask,
-                        flow.getDestiantion(), tmpMask,
+                        flow.getDestination(), tmpMask,
                         paths.get(index + 1).getPortId().getPortNumber(),
                         paths.get(index).getPortId().getPortNumber(),
                         paths.get(index).getNodeId(),
