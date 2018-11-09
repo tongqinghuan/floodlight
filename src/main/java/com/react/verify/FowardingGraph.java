@@ -1,12 +1,12 @@
 package com.react.verify;
 
 
-import java.util.*;
-
-import com.react.schronized_rpc.Flow;
+import com.react.compiler.Flow;
 import com.react.topo.ConnectedSwitch;
 import com.react.topo.Network;
 import com.react.topo.TwoTuple;
+
+import java.util.*;
 
 public class FowardingGraph {
 
@@ -119,9 +119,9 @@ public class FowardingGraph {
             } else {
                 ENode current = vList.get(p1).firstEdge.nextEdge;
                 while (current != null) {
-                    current = current.nextEdge;//连通
+                    current = current.nextEdge;
                 }
-                current = edge;//有问题 edge = new Enode(vList.get(p1), vList.get(p1).firstEdge)
+                current = edge;
             }
         }
         flag = true;
@@ -165,7 +165,7 @@ public class FowardingGraph {
 
     public static boolean traversIntent(Flow flow) {
         Instruction sr = SemanticRepair.flow_semantic_rules.get(
-                flow.getDestiantion()).get(Network.host_edgeport.get(flow.getSource()).sid);//first hop
+                flow.getDestination()).get(Network.host_edgeport.get(flow.getSource()).sid);//first hop
         String current_switch_id = sr.scope.scope.get("switch_id");
         Map<String, ConnectedSwitch> connected_switch = Network.getConnectedSwitch(Network.switches.get(current_switch_id));
         Set<TwoTuple<String>> art_dof = new HashSet<TwoTuple<String>>();

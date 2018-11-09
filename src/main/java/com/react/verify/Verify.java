@@ -129,7 +129,7 @@ public class Verify implements IFloodlightModule,
 //			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
                             ECOperations.update_ecMatched_rules(ecs,
                                     tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
-                            System.out.println(ecs.size() + "ECs：" + ecs);
+                            System.out.println(ecs.size() + "ECs:" + ecs);
                             System.out.println(ec_matched_rules);
                         }
 
@@ -178,7 +178,7 @@ public class Verify implements IFloodlightModule,
 //			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
                         ECOperations.update_ecMatched_rules(ecs,
                                 tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
-                        System.out.println(ecs.size() + "ECs：" + ecs);
+                        System.out.println(ecs.size() + "ECs:" + ecs);
                         System.out.println(ec_matched_rules);
                     }
 

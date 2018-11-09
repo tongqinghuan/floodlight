@@ -2,14 +2,12 @@
 
 package com.react.verify;
 
-import java.util.*;
-
 import com.react.topo.ConnectedSwitch;
-import com.react.topo.FourTuple;
 import com.react.topo.Network;
 import com.react.topo.Port;
 import com.react.topo.TwoTuple;
-import com.react.annotation.InstallRules;
+
+import java.util.*;
 
 public class SemanticRepair {
     static List<Instruction> unchanged_rules = new ArrayList<Instruction>();
@@ -20,7 +18,6 @@ public class SemanticRepair {
     public static HashMap<String, HashMap<String, Instruction>> flow_semantic_rules = new HashMap<String, HashMap<String, Instruction>>();
 
     public static boolean semanticRepair(Instruction semantic_rules, Set<TwoTuple<String>> dof, int count) {
-// 由scope得到当前交换机和相连交换机
         String current_switch_id = semantic_rules.scope.scope.get("switch_id");
         Map<String, ConnectedSwitch> connected_switch = Network.getConnectedSwitch(Network.switches.get(current_switch_id));
         Set<TwoTuple<String>> art_dof = new HashSet<TwoTuple<String>>();
@@ -29,8 +26,6 @@ public class SemanticRepair {
         Set<TwoTuple<String>> fixed_forward = new HashSet<TwoTuple<String>>();
         Set<TwoTuple<String>> towards = new HashSet<TwoTuple<String>>();
         //System.out.println("semantic_rules"+semantic_rules);
-
-        //由之前计算好的SR，得到DOF,分类处理
         art_dof.addAll(semantic_rules.annotation.annotation);
         int maxhops = semantic_rules.constraint.hop;
 
@@ -79,8 +74,7 @@ public class SemanticRepair {
                 //System.out.println(dst_ip);
                 //System.out.println(sw.sid);
                 //System.out.println(flow_semantic_rules);
-                Instruction ins = flow_semantic_rules.get(dst_ip).get(sw.sid);//候选交换机的SR作为新的SR
-
+                Instruction ins = flow_semantic_rules.get(dst_ip).get(sw.sid);
                 if (ins == null) {
                     ins = new Instruction(new Scope(sw.sid, semantic_rules.scope.scope.get("dst_ip")), new Constraint(), new Annotation());
                 }

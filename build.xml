@@ -142,6 +142,7 @@
            debug="true" 
            srcdir="${source}:${thrift.out.dir}"
            destdir="${build}">
+		   <compilerarg line="-encoding UTF-8 "/>
         </javac>
         <copy todir="${build}">
             <fileset dir="${resources}" />

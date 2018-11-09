@@ -1,12 +1,11 @@
 package com.react.topo;
 
-public class ConnectedSwitch {
+public class ConnectedSwitch{
     public int pid;
     public String sid;
-
-    public ConnectedSwitch(int pid, String sid) {
-        this.pid = pid;
-        this.sid = sid;
+    public ConnectedSwitch(int pid,String sid) {
+        this.pid=pid;
+        this.sid=sid;
     }
 
     @Override
@@ -17,7 +16,6 @@ public class ConnectedSwitch {
         result = prime * result + ((sid == null) ? 0 : sid.hashCode());
         return result;
     }
-
     @Override
     public boolean equals(Object obj) {
         if (this == obj)
@@ -36,9 +34,9 @@ public class ConnectedSwitch {
             return false;
         return true;
     }
-
     @Override
-    public String toString() {
-        return " port " + pid + " connect with switch " + sid ;
+    public String toString()
+    {
+        return "ConnectedSwitch [pid=" + pid + ", sid=" + sid + "]";
     }
 }

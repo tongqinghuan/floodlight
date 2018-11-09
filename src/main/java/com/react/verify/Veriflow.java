@@ -1,46 +1,26 @@
 package com.react.verify;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.Iterator;
-import java.util.Map;
-import java.util.Set;
-
-import org.projectfloodlight.openflow.protocol.OFFactories;
-import org.projectfloodlight.openflow.protocol.OFFlowMod;
-
-import org.projectfloodlight.openflow.protocol.OFMessage;
-import org.projectfloodlight.openflow.protocol.OFPortDesc;
-import org.projectfloodlight.openflow.protocol.OFType;
-import org.projectfloodlight.openflow.protocol.OFVersion;
-import org.projectfloodlight.openflow.types.DatapathId;
-import org.projectfloodlight.openflow.types.TableId;
-import org.projectfloodlight.openflow.types.U16;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import net.floodlightcontroller.core.FloodlightContext;
-import net.floodlightcontroller.core.IOFMessageListener;
-import net.floodlightcontroller.core.IOFSwitch;
-import net.floodlightcontroller.core.IOFSwitchListener;
-import net.floodlightcontroller.core.PortChangeType;
+import net.floodlightcontroller.core.*;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
 import net.floodlightcontroller.core.module.IFloodlightService;
-import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.staticflowentry.StaticFlowEntries;
-import net.floodlightcontroller.staticflowentry.StaticFlowEntryPusher;
-
-import net.floodlightcontroller.staticflowentry.web.StaticFlowEntryWebRoutable;
 import net.floodlightcontroller.storage.IResultSet;
 import net.floodlightcontroller.storage.IStorageSourceListener;
 import net.floodlightcontroller.storage.IStorageSourceService;
 import net.floodlightcontroller.util.ActionUtils;
 import net.floodlightcontroller.util.InstructionUtils;
 import net.floodlightcontroller.util.MatchUtils;
+import org.projectfloodlight.openflow.protocol.*;
+import org.projectfloodlight.openflow.types.DatapathId;
+import org.projectfloodlight.openflow.types.TableId;
+import org.projectfloodlight.openflow.types.U16;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.*;
 
 public class Veriflow implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
@@ -326,25 +306,25 @@ public class Veriflow implements IFloodlightModule,
     public void rowsModified(String tableName, Set<Object> rowKeys) {
         // This handles both rowInsert() and rowUpdate()
         //		System.out.println("rowsModified is triggered");
-        HashMap<String, Map<String, OFFlowMod>> entriesToAdd = new HashMap<String, Map<String, OFFlowMod>>();
-
-        // build up list of what was added
-        for (Object key : rowKeys) {
-            IResultSet resultSet = storageSourceService.getRow(tableName, key);
-            Iterator<IResultSet> it = resultSet.iterator();
-            while (it.hasNext()) {
-                Map<String, Object> row = it.next().getRow();
-                parseRow(row, entriesToAdd);
-            }
-        }
-
-        for (String dpid : entriesToAdd.keySet()) {
-            for (String entry : entriesToAdd.get(dpid).keySet()) {
-                //	System.out.println(Long.toString(DatapathId.of(dpid).getLong()));
-                OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
-                Verify.checkNetworkInvariant(newFlowMod, DatapathId.of(dpid));
-            }
-        }
+//        HashMap<String, Map<String, OFFlowMod>> entriesToAdd = new HashMap<String, Map<String, OFFlowMod>>();
+//
+//        // build up list of what was added
+//        for (Object key : rowKeys) {
+//            IResultSet resultSet = storageSourceService.getRow(tableName, key);
+//            Iterator<IResultSet> it = resultSet.iterator();
+//            while (it.hasNext()) {
+//                Map<String, Object> row = it.next().getRow();
+//                parseRow(row, entriesToAdd);
+//            }
+//        }
+//
+//        for (String dpid : entriesToAdd.keySet()) {
+//            for (String entry : entriesToAdd.get(dpid).keySet()) {
+//                //	System.out.println(Long.toString(DatapathId.of(dpid).getLong()));
+//                OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
+//                Verify.checkNetworkInvariant(newFlowMod, DatapathId.of(dpid));
+//            }
+//        }
     }
 
     @Override

@@ -1,10 +1,10 @@
 package com.react.verify;
 
+import com.react.topo.Node;
+
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
-
-import com.react.topo.Node;
 
 public class Trie {
     private Node root = new Node("");
@@ -151,7 +151,7 @@ public class Trie {
                 }
             }
             //System.out.println("temp"+temp);
-            currentNodeSet.clear(); //考虑去掉这行，每次只遍历新加的节点
+            currentNodeSet.clear();
             currentNodeSet.addAll(temp);
 //			currentNodeSet is a path of flow during traveling the tree
         }

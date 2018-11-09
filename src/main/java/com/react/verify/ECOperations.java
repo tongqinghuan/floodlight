@@ -1,19 +1,10 @@
 package com.react.verify;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.TreeSet;
-
 import com.react.topo.Network;
 import com.react.topo.Port;
 import com.react.topo.TwoTuple;
+
+import java.util.*;
 
 class EC {
     String start;
@@ -325,7 +316,6 @@ public class ECOperations {
         Set<ECGraph> ecGraph = new HashSet<ECGraph>();
         List<FlowRule> rule_per_ec = new ArrayList<FlowRule>();
         HashMap<String, FlowRule> flow_rules_ec = new HashMap<String, FlowRule>();
-// sw上优先级最高的flowrule
         for (ECMatchedRules entry : ec_matched_rules) {
             EC ec = entry.ec;
             rule_per_ec.clear();
@@ -336,15 +326,15 @@ public class ECOperations {
                 rule_per_ec.addAll(rules.get(per_flow));
                 int size = rules.get(per_flow).size();
                 srcdst.add(new TwoTuple(rules.get(per_flow).get(0).sw, rules.get(per_flow).get(size - 1).sw));
-                //有问题。这里假设了一条流只有两条流表
+
             }
 
             for (FlowRule temp : rule_per_ec) {
                 String sw = temp.sw;
-                if (flow_rules_ec.keySet().contains(sw)) {//sw相同
+                if (flow_rules_ec.keySet().contains(sw)) {
                     if (flow_rules_ec.get(sw).getPriority() < temp.getPriority()) {
                         flow_rules_ec.replace(sw, flow_rules_ec.get(sw), temp);
-                    }//有问题。这里选出的是交换机上流表优先级最高的。没考虑flow是否一致。
+                    }
                 } else {
                     flow_rules_ec.put(sw, temp);
                 }
