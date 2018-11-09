@@ -6,17 +6,21 @@ import java.util.HashMap;
 public class Scope{
 	private String[] name= {"switch_id","dst_ip"};
     HashMap<String,String> scope;
-	public Scope(String switch_id,String dst_ip) {
-		scope=new HashMap<String,String>();
+
+	public Scope(String switch_id, String dst_ip) {
+		scope = new HashMap<String,String>();
 		this.scope.put(name[0], switch_id);
-		this.scope.put(name[1],dst_ip);
+		this.scope.put(name[1], dst_ip);
 	}
+
 	public HashMap getScope() {
 		return scope;
 	}
+
 	public void setScope(HashMap scope) {
 		this.scope = scope;
 	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -25,6 +29,7 @@ public class Scope{
 		result = prime * result + ((scope == null) ? 0 : scope.hashCode());
 		return result;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -43,6 +48,7 @@ public class Scope{
 			return false;
 		return true;
 	}
+
 	@Override
 	public String toString() {
 		return this.scope.toString();

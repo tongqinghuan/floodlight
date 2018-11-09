@@ -13,6 +13,7 @@ public class Instruction{
 	Annotation annotation;
 	int priority;
 	boolean is_validation;
+
 	public Instruction(Scope scope,Constraint constraint,Annotation annotation) {
 		this.scope=scope;
 		this.constraint=constraint;
@@ -20,6 +21,7 @@ public class Instruction{
 		this.priority=0;
 		this.is_validation=false;
 	}
+
 	public boolean equals(Object obj) {
 		if (this == obj)
 			return true;
@@ -42,18 +44,23 @@ public class Instruction{
 			return false;
 		return true;
 	}
+
 	public int getPriority() {
 		return priority;
 	}
+
 	public void setPriority(int priority) {
 		this.priority = priority;
 	}
+
 	public boolean isIs_validation() {
 		return is_validation;
 	}
+
 	public void setIs_validation(boolean is_validation) {
 		this.is_validation = is_validation;
 	}
+
 	public String toString() {
 		return "Instruction [scope=" + scope + ", constraint=" + constraint + ", annotation=" + annotation
 				+ ", priority=" + priority + ", is_validation=" + is_validation + "]";

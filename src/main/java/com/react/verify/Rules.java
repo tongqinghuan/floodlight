@@ -5,9 +5,11 @@ import java.util.HashMap;
 
 class Flow{
 	String dst_ip;
+
 	Flow(String dst_ip){
 		this.dst_ip=dst_ip;
 	}
+
 	@Override
 	public int hashCode() {
 		final int prime = 31;
@@ -15,6 +17,7 @@ class Flow{
 		result = prime * result + ((dst_ip == null) ? 0 : dst_ip.hashCode());
 		return result;
 	}
+
 	@Override
 	public boolean equals(Object obj) {
 		if (this == obj)
@@ -31,19 +34,20 @@ class Flow{
 			return false;
 		return true;
 	}
+
 	@Override
 	public String toString() {
 		return "Flow [dst_ip=" + dst_ip + "]";
 	}
-	
-	
 }
+
 // inport ?
 class FlowRule{
 	String sw;
 	String dst_ip;
 	int priority;
 	HashMap<String,Integer> action;
+
 	FlowRule(String sw,String dst_ip,int priority,HashMap<String,Integer> action){
 	    this.sw=sw;
 		this.dst_ip=dst_ip;
