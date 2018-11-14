@@ -1,29 +1,31 @@
 package com.react.verify;
 
-import net.floodlightcontroller.core.*;
+import net.floodlightcontroller.core.FloodlightContext;
+import net.floodlightcontroller.core.IFloodlightProviderService;
+import net.floodlightcontroller.core.IOFMessageListener;
+import net.floodlightcontroller.core.IOFSwitch;
+import net.floodlightcontroller.core.module.FloodlightModuleContext;
+import net.floodlightcontroller.core.module.FloodlightModuleException;
 import net.floodlightcontroller.core.module.IFloodlightModule;
+import net.floodlightcontroller.core.module.IFloodlightService;
 import net.floodlightcontroller.restserver.IRestApiService;
 import net.floodlightcontroller.storage.IStorageSourceService;
-import org.projectfloodlight.openflow.protocol.*;
+import org.projectfloodlight.openflow.protocol.OFFlowMod;
+import org.projectfloodlight.openflow.protocol.OFFlowModCommand;
+import org.projectfloodlight.openflow.protocol.OFMessage;
+import org.projectfloodlight.openflow.protocol.OFType;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
-import org.projectfloodlight.openflow.types.*;
+import org.projectfloodlight.openflow.types.DatapathId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.projectfloodlight.openflow.protocol.OFMessage;
-import org.projectfloodlight.openflow.protocol.OFType;
 
-import net.floodlightcontroller.core.module.FloodlightModuleContext;
-import net.floodlightcontroller.core.module.FloodlightModuleException;
-import net.floodlightcontroller.core.module.IFloodlightService;
-
-import java.util.Map.Entry;
 import java.util.*;
 
 public class Verify implements IFloodlightModule,
         IVerifyService, IOFMessageListener {
-    protected static Logger log;
+    protected static Logger log = LoggerFactory.getLogger(Verify.class);
     protected IRestApiService restApi;
     protected IFloodlightProviderService floodlightProvider;
     protected IStorageSourceService storageSource;
@@ -39,6 +41,37 @@ public class Verify implements IFloodlightModule,
     public static boolean is_checkIntent = false;
     public static boolean is_check = false;
     protected static Trie trie = new Trie();
+
+
+    public static int NumberOf1(int n) {
+        if (n == 0) {
+            return 0;
+        }
+        int count = 0;
+        while (n != 0) {
+            n = n & (n-1);
+            count++;
+        }
+        return count;
+    }
+
+    public static int getMaskLength(String mask){
+        if(mask==null){
+            return 32;
+        }
+        String[] ipStrs=mask.split("\\.");
+        int mask_length=0;
+        for(int i=0;i<4;i++){
+            if(Integer.parseInt(ipStrs[i])==0){
+                continue;
+            }
+            mask_length+=NumberOf1(Integer.parseInt(ipStrs[i]));
+
+        }
+        return mask_length;
+
+
+    }
 
     /**
      * generate IPwithNetmask
@@ -69,196 +102,202 @@ public class Verify implements IFloodlightModule,
         FlowRule flow_rule = null;
         Flow flow = null;
 //        Flow currflow = null;
-        log.warn(flowMod.toString());
+//        log.info(flowMod.toString());
 
-        try {
-            if (flowMod != null && flowMod.getMatch() != null) {
-                if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
-                    String dst_ip;
-                    if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
-                        dst_ip = ipInt2String(
-                                flowMod.getMatch().get(MatchField.IPV4_DST).getInt(), 32);
-                    } else {
-                        dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
-                                flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+        if (flowMod != null && flowMod.getMatch() != null) {
+            if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
+                String dst_ip;
+                if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                    dst_ip = ipInt2String(
+                            flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),getMaskLength(flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
+                    log.info("dst_ip:"+dst_ip);
+                } else {
+                    dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
+                            flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                }
+                flow = new Flow(dst_ip);
+
+                //extract actions from flow_mod
+                List<OFAction> actions = flowMod.getActions();
+                for (OFAction a : actions) {
+                    switch (a.getType()) {
+                        case OUTPUT:
+                            action0.put("forward", (((OFActionOutput) a).getPort().getPortNumber()));
+                            break;
+                        case SET_FIELD:
+                            break;
                     }
-                    flow = new Flow(dst_ip);
+                }
 
-                    //extract actions from flow_mod
-                    List<OFAction> actions = flowMod.getActions();
-                    for (OFAction a : actions) {
-                        switch (a.getType()) {
-                            case OUTPUT:
-                                action0.put("forward", (((OFActionOutput) a).getPort().getPortNumber()));
-                                break;
-                            case SET_FIELD:
-                                break;
-                        }
-                    }
-
-                    //extract flow_rule from flow_mod message
-                    //FlowRule dpid,ip,priority,action
-                    flow_rule = new FlowRule(
-                            Long.toString(dpid.getLong()),
-                            dst_ip,
-                            flowMod.getPriority(),
-                            action0);
+                //extract flow_rule from flow_mod message
+                //FlowRule dpid,ip,priority,action
+                flow_rule = new FlowRule(
+                        Long.toString(dpid.getLong()),
+                        dst_ip,
+                        flowMod.getPriority(),
+                        action0);
+                log.info("decode flow_mod message:" + flow_rule.toString());
 
 //                    currflow = flow;
-                    if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
-                            flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
-                            flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
-                        log.info("constructing the Trie...");
-
-                        for (String currflow : flowEntry.keySet()) {
-                            if (trie.containFlow(currflow)) {
-                                continue;
-                            }
-                            Set<String> overlayflow = new HashSet<>();
-                            Set<String> tmp = trie.FlowSet2StringSet(
-                                    trie.searchConflictFlow(new Flow(currflow)));
-                            overlayflow.addAll(tmp);
-                            System.out.println("conflict flow in the trie:" + overlayflow);
-                            if (!trie.containFlow(currflow)) {
-                                trie.addFlow(new Flow(currflow));
-                            }
-                            overlayflow.add(currflow);
-                            EC tmpec = ECOperations.updateEC(
-                                    ecs, trie.StringSet2FlowSet(overlayflow),
-                                    new Flow(currflow), IsNeedRemoveOldEc);
-//			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
-                            ECOperations.update_ecMatched_rules(ecs,
-                                    tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
-                            System.out.println(ecs.size() + "ECs:" + ecs);
-                            System.out.println(ec_matched_rules);
-                        }
-
-                        if (!ruleset.containsKey(flow)) {
-                            ruleset.put(flow, new ArrayList<FlowRule>());
-                        }
-
-                        ruleset.get(flow).add(flow_rule);
-                        //	log.info("flowEntry--->"+flowEntry.toString()+"\n");
-                        log.info("RuleSet: " + ruleset);
-                    } else if (flowMod.getCommand().equals(OFFlowModCommand.DELETE) || flowMod.getCommand().equals(OFFlowModCommand.DELETE_STRICT)) {
-                        if (trie.containFlow(dst_ip)) {
-                            trie.deleteFlow(dst_ip);
-                            //<editor-fold desc="?">
-                            for (Iterator<Map.Entry<String, String>> it = flowEntry.entrySet().iterator(); it.hasNext(); ) {
-                                Entry<String, String> item = it.next();
-                                if (item.getKey().equals(dst_ip)) {
-                                    it.remove();
-                                    break;
-                                }
-                            }
-                            //</editor-fold>
-                            //delete ruleset
-                            if (ruleset.keySet().contains(flow)) {
-                                ruleset.get(flow).remove(flow_rule);
-                            }
-                        }
-                    }
-
-                    for (String currentflow : flowEntry.keySet()) {
-                        if (trie.containFlow(currentflow)) {
-                            continue;
-                        }
-                        Set<String> overlayflow = new HashSet<>();
-                        Set<String> tmp = Trie.FlowSet2StringSet(
-                                trie.searchConflictFlow(new Flow(currentflow)));
-                        overlayflow.addAll(tmp);
-                        System.out.println("conflict flow in the trie:" + overlayflow);
-                        if (!trie.containFlow(currentflow)) {
-                            trie.addFlow(new Flow(currentflow));
-                        }
-                        overlayflow.add(currentflow);
-                        EC tmpec = ECOperations.updateEC(
-                                ecs, Trie.StringSet2FlowSet(overlayflow),
-                                new Flow(currentflow), IsNeedRemoveOldEc);
-//			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
-                        ECOperations.update_ecMatched_rules(ecs,
-                                tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
-                        System.out.println(ecs.size() + "ECs:" + ecs);
-                        System.out.println(ec_matched_rules);
-                    }
-
-                    Map<String, String> flowEntry1 = new HashMap<String, String>();
-//		flowEntry1.put("0000101100000001xxxxxxxxxxxxxxxx", "sw1");
-//		flowEntry1.put("00001011xxxxxxxxxxxxxxxxxxxxxxxx", "sw1");
-//		flowEntry1.put("1100000000000001xxxxxxxxxxxxxxxx", "sw2");
-
-                    for (String currentflow : flowEntry1.keySet()) {
-//			if the flow is in the tree,there is no chang
-                        if (trie.containFlow(currentflow)) {
-                            continue;
-                        }
-//			if the flow is in the tree, add flow to tree and update ec
-//			if there is not conflict,add ec;
-//			if conflict,if new flow rang is bigger,add , if smaller,remove  and add
-                        Set<String> overlayflow = new HashSet<>();
-                        Set<String> tmp = trie.FlowSet2StringSet(trie.searchConflictFlow(new Flow(currentflow)));
-                        overlayflow.addAll(tmp);
-                        if (trie.getflag() == false) {
-                            IsNeedRemoveOldEc = true;
-                        }
-                        System.out.println("conflict flow in the trie:" + overlayflow);
-                        if (!trie.containFlow(currentflow)) {
-                            trie.addFlow(new Flow(currentflow));
-                        }
-                        overlayflow.add(currentflow);
-                        EC tmpec = ECOperations.updateEC(ecs, trie.StringSet2FlowSet
-                                (overlayflow), new Flow(currentflow), IsNeedRemoveOldEc);
-                        ECOperations.update_ecMatched_rules(ecs, tmpec,
-                                ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
-                        System.out.println(ecs.size() + " EC:" + ecs);
-                        System.out.println(ec_matched_rules.size() + " ec_matched_rules:" + ec_matched_rules);
-                    }
-
-
-                    System.out.println("flow--flowRules" + ruleset.toString());
-                    Set<ECGraph> ecGraph = ECOperations.getNodeEdge(ec_matched_rules, ruleset);
-                    System.out.println("ecGraph:" + ecGraph);
-//		if(ecGraph.size()==Network.switches.size()){
-                    List<FowardingGraph> forwardingGraph = new ArrayList<FowardingGraph>();
-                    for (ECGraph graph : ecGraph) {
-                        FowardingGraph graph_per_ec = new FowardingGraph();
-                        graph_per_ec.ec = graph.ec;
-                        graph_per_ec.setDeviceset(graph.deviceset);
-                        graph_per_ec.setEdges(graph.edges);
-                        graph_per_ec.setSrcDstPair(graph.srcDstPair);
-
-                        System.out.println("deviceset:" + graph_per_ec.deviceset);
-                        System.out.println("edges:" + graph_per_ec.edges);
-
-                        graph_per_ec.createGraph();
-
-//                        System.out.println("forwadingGraph:" + graph_per_ec.forwardingGraph);
-
-                        forwardingGraph.add(graph_per_ec);
-                    }
-//			flowmod is listened one by one, compute EC，cannot predict whether forwarding graph complete
-//			if(forwardingGraph.size()==ops){
-                    for (FowardingGraph graph : forwardingGraph) {
-                        graph.traverse();
-                        System.out.println("graph is loop\t" + graph.is_loop);
-                        System.out.println("graph is reachable\t" + graph.is_reachable);
-                        System.out.println("graph is backe_hole\t" + graph.is_back_hole);
-                    }
-            } else {
-                log.warn("match's dstip is null)");
-                return false;
+                if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
+                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
+                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
+                    log.info("constructing the Trie...");
+                }
             }
         }
-        is_checkIntent = true;
-        is_check = true;
-    } catch(
-    Exception e)
-
-    {
-        e.printStackTrace();
-    }
         return true;
-}
+    }
+//
+//                        for (String currflow : flowEntry.keySet()) {
+//                            if (trie.containFlow(currflow)) {
+//                                continue;
+//                            }
+//                            Set<String> overlayflow = new HashSet<>();
+//                            Set<String> tmp = trie.FlowSet2StringSet(
+//                                    trie.searchConflictFlow(new Flow(currflow)));
+//                            overlayflow.addAll(tmp);
+//                            System.out.println("conflict flow in the trie:" + overlayflow);
+//                            if (!trie.containFlow(currflow)) {
+//                                trie.addFlow(new Flow(currflow));
+//                            }
+//                            overlayflow.add(currflow);
+//                            EC tmpec = ECOperations.updateEC(
+//                                    ecs, trie.StringSet2FlowSet(overlayflow),
+//                                    new Flow(currflow), IsNeedRemoveOldEc);
+////			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
+//                            ECOperations.update_ecMatched_rules(ecs,
+//                                    tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
+//                            System.out.println(ecs.size() + "ECs:" + ecs);
+//                            System.out.println(ec_matched_rules);
+//                        }
+//
+//                        if (!ruleset.containsKey(flow)) {
+//                            ruleset.put(flow, new ArrayList<FlowRule>());
+//                        }
+//
+//                        ruleset.get(flow).add(flow_rule);
+//                        //	log.info("flowEntry--->"+flowEntry.toString()+"\n");
+//                        log.info("RuleSet: " + ruleset);
+//                    } else if (flowMod.getCommand().equals(OFFlowModCommand.DELETE) || flowMod.getCommand().equals(OFFlowModCommand.DELETE_STRICT)) {
+//                        if (trie.containFlow(dst_ip)) {
+//                            trie.deleteFlow(dst_ip);
+//                            //<editor-fold desc="?">
+//                            for (Iterator<Map.Entry<String, String>> it = flowEntry.entrySet().iterator(); it.hasNext(); ) {
+//                                Entry<String, String> item = it.next();
+//                                if (item.getKey().equals(dst_ip)) {
+//                                    it.remove();
+//                                    break;
+//                                }
+//                            }
+//                            //</editor-fold>
+//                            //delete ruleset
+//                            if (ruleset.keySet().contains(flow)) {
+//                                ruleset.get(flow).remove(flow_rule);
+//                            }
+//                        }
+//                    }
+//
+//                    for (String currentflow : flowEntry.keySet()) {
+//                        if (trie.containFlow(currentflow)) {
+//                            continue;
+//                        }
+//                        Set<String> overlayflow = new HashSet<>();
+//                        Set<String> tmp = Trie.FlowSet2StringSet(
+//                                trie.searchConflictFlow(new Flow(currentflow)));
+//                        overlayflow.addAll(tmp);
+//                        System.out.println("conflict flow in the trie:" + overlayflow);
+//                        if (!trie.containFlow(currentflow)) {
+//                            trie.addFlow(new Flow(currentflow));
+//                        }
+//                        overlayflow.add(currentflow);
+//                        EC tmpec = ECOperations.updateEC(
+//                                ecs, Trie.StringSet2FlowSet(overlayflow),
+//                                new Flow(currentflow), IsNeedRemoveOldEc);
+////			ec_matched_rules = ECOperations.update_ecMatched_rules( ecs, trie.StringSet2FlowSet(overlayflow));
+//                        ECOperations.update_ecMatched_rules(ecs,
+//                                tmpec, ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
+//                        System.out.println(ecs.size() + "ECs:" + ecs);
+//                        System.out.println(ec_matched_rules);
+//                    }
+//
+//                    Map<String, String> flowEntry1 = new HashMap<String, String>();
+////		flowEntry1.put("0000101100000001xxxxxxxxxxxxxxxx", "sw1");
+////		flowEntry1.put("00001011xxxxxxxxxxxxxxxxxxxxxxxx", "sw1");
+////		flowEntry1.put("1100000000000001xxxxxxxxxxxxxxxx", "sw2");
+//
+//                    for (String currentflow : flowEntry1.keySet()) {
+////			if the flow is in the tree,there is no chang
+//                        if (trie.containFlow(currentflow)) {
+//                            continue;
+//                        }
+////			if the flow is in the tree, add flow to tree and update ec
+////			if there is not conflict,add ec;
+////			if conflict,if new flow rang is bigger,add , if smaller,remove  and add
+//                        Set<String> overlayflow = new HashSet<>();
+//                        Set<String> tmp = trie.FlowSet2StringSet(trie.searchConflictFlow(new Flow(currentflow)));
+//                        overlayflow.addAll(tmp);
+//                        if (trie.getflag() == false) {
+//                            IsNeedRemoveOldEc = true;
+//                        }
+//                        System.out.println("conflict flow in the trie:" + overlayflow);
+//                        if (!trie.containFlow(currentflow)) {
+//                            trie.addFlow(new Flow(currentflow));
+//                        }
+//                        overlayflow.add(currentflow);
+//                        EC tmpec = ECOperations.updateEC(ecs, trie.StringSet2FlowSet
+//                                (overlayflow), new Flow(currentflow), IsNeedRemoveOldEc);
+//                        ECOperations.update_ecMatched_rules(ecs, tmpec,
+//                                ec_matched_rules, trie.StringSet2FlowSet(overlayflow));
+//                        System.out.println(ecs.size() + " EC:" + ecs);
+//                        System.out.println(ec_matched_rules.size() + " ec_matched_rules:" + ec_matched_rules);
+//                    }
+//
+//
+//                    System.out.println("flow--flowRules" + ruleset.toString());
+//                    Set<ECGraph> ecGraph = ECOperations.getNodeEdge(ec_matched_rules, ruleset);
+//                    System.out.println("ecGraph:" + ecGraph);
+////		if(ecGraph.size()==Network.switches.size()){
+//                    List<FowardingGraph> forwardingGraph = new ArrayList<FowardingGraph>();
+//                    for (ECGraph graph : ecGraph) {
+//                        FowardingGraph graph_per_ec = new FowardingGraph();
+//                        graph_per_ec.ec = graph.ec;
+//                        graph_per_ec.setDeviceset(graph.deviceset);
+//                        graph_per_ec.setEdges(graph.edges);
+//                        graph_per_ec.setSrcDstPair(graph.srcDstPair);
+//
+//                        System.out.println("deviceset:" + graph_per_ec.deviceset);
+//                        System.out.println("edges:" + graph_per_ec.edges);
+//
+//                        graph_per_ec.createGraph();
+//
+////                        System.out.println("forwadingGraph:" + graph_per_ec.forwardingGraph);
+//
+//                        forwardingGraph.add(graph_per_ec);
+//                    }
+////			flowmod is listened one by one, compute EC，cannot predict whether forwarding graph complete
+////			if(forwardingGraph.size()==ops){
+//                    for (FowardingGraph graph : forwardingGraph) {
+//                        graph.traverse();
+//                        System.out.println("graph is loop\t" + graph.is_loop);
+//                        System.out.println("graph is reachable\t" + graph.is_reachable);
+//                        System.out.println("graph is backe_hole\t" + graph.is_back_hole);
+//                    }
+//            } else {
+//                log.warn("match's dstip is null)");
+//                return false;
+//            }
+//        }
+//        is_checkIntent = true;
+//        is_check = true;
+//    } catch(
+//    Exception e)
+//
+//    {
+//        e.printStackTrace();
+//    }
+//        return true;
+
 
     //<editor-fold desc="verytest">
 	/*public static int veriytest(OFFlowMod flowMod, DatapathId dpid) {

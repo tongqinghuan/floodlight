@@ -10,9 +10,8 @@ import net.floodlightcontroller.staticflowentry.StaticFlowEntries;
 import net.floodlightcontroller.storage.IResultSet;
 import net.floodlightcontroller.storage.IStorageSourceListener;
 import net.floodlightcontroller.storage.IStorageSourceService;
-import net.floodlightcontroller.util.ActionUtils;
-import net.floodlightcontroller.util.InstructionUtils;
-import net.floodlightcontroller.util.MatchUtils;
+import net.floodlightcontroller.storage.StorageException;
+import net.floodlightcontroller.util.*;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.TableId;
@@ -21,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Veriflow implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
@@ -101,9 +101,39 @@ public class Veriflow implements IFloodlightModule,
     public static final String COLUMN_INSTR_GOTO_METER = InstructionUtils.STR_GOTO_METER;
     public static final String COLUMN_INSTR_EXPERIMENTER = InstructionUtils.STR_EXPERIMENTER;
 
+    public static String ColumnNames[] = { COLUMN_NAME, COLUMN_SWITCH,
+            COLUMN_TABLE_ID, COLUMN_ACTIVE, COLUMN_IDLE_TIMEOUT, COLUMN_HARD_TIMEOUT, // table id is new for OF1.3 as well
+            COLUMN_PRIORITY, COLUMN_COOKIE, COLUMN_IN_PORT,
+            COLUMN_DL_SRC, COLUMN_DL_DST, COLUMN_DL_VLAN, COLUMN_DL_VLAN_PCP,
+            COLUMN_DL_TYPE, COLUMN_NW_TOS, COLUMN_NW_PROTO, COLUMN_NW_SRC,
+            COLUMN_NW_DST, COLUMN_TP_SRC, COLUMN_TP_DST,
+            /* newly added matches for OF1.3 port start here */
+            COLUMN_SCTP_SRC, COLUMN_SCTP_DST,
+            COLUMN_UDP_SRC, COLUMN_UDP_DST, COLUMN_TCP_SRC, COLUMN_TCP_DST,
+            COLUMN_ICMP_TYPE, COLUMN_ICMP_CODE,
+            COLUMN_ARP_OPCODE, COLUMN_ARP_SHA, COLUMN_ARP_DHA,
+            COLUMN_ARP_SPA, COLUMN_ARP_DPA,
+
+            /* IPv6 related matches */
+            COLUMN_NW6_SRC, COLUMN_NW6_DST, COLUMN_ICMP6_TYPE, COLUMN_ICMP6_CODE,
+            COLUMN_IPV6_FLOW_LABEL, COLUMN_ND_SLL, COLUMN_ND_TLL, COLUMN_ND_TARGET,
+            COLUMN_MPLS_LABEL, COLUMN_MPLS_TC, COLUMN_MPLS_BOS,
+            COLUMN_METADATA, COLUMN_TUNNEL_ID, COLUMN_PBB_ISID,
+            /* end newly added matches */
+            COLUMN_ACTIONS,
+            /* newly added instructions for OF1.3 port start here */
+            COLUMN_INSTR_GOTO_TABLE, COLUMN_INSTR_WRITE_METADATA,
+            COLUMN_INSTR_WRITE_ACTIONS, COLUMN_INSTR_APPLY_ACTIONS,
+            COLUMN_INSTR_CLEAR_ACTIONS, COLUMN_INSTR_GOTO_METER,
+            COLUMN_INSTR_EXPERIMENTER
+            /* end newly added instructions */
+    };
 
     protected IOFSwitchService switchService;
     protected IStorageSourceService storageSourceService;
+
+    protected Map<String, Map<String, OFFlowMod>> entriesFromStorage;
+    protected Map<String, String> entry2dpid;
 
     @Override
     public String getName() {
@@ -156,7 +186,32 @@ public class Veriflow implements IFloodlightModule,
         storageSourceService = context.getServiceImpl(IStorageSourceService.class);
 
     }
-
+    private Map<String, Map<String, OFFlowMod>> readEntriesFromStorage() {
+        Map<String, Map<String, OFFlowMod>> entries = new ConcurrentHashMap<String, Map<String, OFFlowMod>>();
+        try {
+            Map<String, Object> row;
+            // null1=no predicate, null2=no ordering
+            IResultSet resultSet = storageSourceService.executeQuery(TABLE_NAME, ColumnNames, null, null);
+            for (Iterator<IResultSet> it = resultSet.iterator(); it.hasNext();) {
+                row = it.next().getRow();
+                parseRow(row, entries);
+            }
+        } catch (StorageException e) {
+            log.error("failed to access storage: {}", e.getMessage());
+            // if the table doesn't exist, then wait to populate later via
+            // setStorageSource()
+        }
+        return entries;
+    }
+    protected Map<String, String> computeEntry2DpidMap(
+            Map<String, Map<String, OFFlowMod>> map) {
+        Map<String, String> ret = new ConcurrentHashMap<String, String>();
+        for(String dpid : map.keySet()) {
+            for( String entry: map.get(dpid).keySet())
+                ret.put(entry, dpid);
+        }
+        return ret;
+    }
     @Override
     public void startUp(FloodlightModuleContext context) throws FloodlightModuleException {
         // TODO Auto-generated method stub
@@ -166,6 +221,8 @@ public class Veriflow implements IFloodlightModule,
         storageSourceService.createTable(TABLE_NAME, null);
         storageSourceService.setTablePrimaryKeyName(TABLE_NAME, COLUMN_NAME);
         storageSourceService.addListener(TABLE_NAME, this);
+        entriesFromStorage = readEntriesFromStorage();
+        entry2dpid = computeEntry2DpidMap(entriesFromStorage);
 
     }
 
@@ -303,28 +360,84 @@ public class Veriflow implements IFloodlightModule,
     }
 
     @Override
-    public void rowsModified(String tableName, Set<Object> rowKeys) {
-        // This handles both rowInsert() and rowUpdate()
-        //		System.out.println("rowsModified is triggered");
-//        HashMap<String, Map<String, OFFlowMod>> entriesToAdd = new HashMap<String, Map<String, OFFlowMod>>();
-//
-//        // build up list of what was added
-//        for (Object key : rowKeys) {
-//            IResultSet resultSet = storageSourceService.getRow(tableName, key);
-//            Iterator<IResultSet> it = resultSet.iterator();
-//            while (it.hasNext()) {
-//                Map<String, Object> row = it.next().getRow();
-//                parseRow(row, entriesToAdd);
-//            }
-//        }
-//
-//        for (String dpid : entriesToAdd.keySet()) {
-//            for (String entry : entriesToAdd.get(dpid).keySet()) {
-//                //	System.out.println(Long.toString(DatapathId.of(dpid).getLong()));
-//                OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
-//                Verify.checkNetworkInvariant(newFlowMod, DatapathId.of(dpid));
-//            }
-//        }
+    public void rowsModified(String tableName, Set<Object> rowKeys){
+        //flow rules insert/update
+        log.debug("Modifying Table {}", tableName);
+        HashMap<String, Map<String, OFFlowMod>> entriesToAdd =
+                new HashMap<String, Map<String, OFFlowMod>>();
+        for (Object key: rowKeys) {
+            IResultSet resultSet = storageSourceService.getRow(tableName, key);
+            Iterator<IResultSet> it = resultSet.iterator();
+            while (it.hasNext()) {
+                Map<String, Object> row = it.next().getRow();
+                parseRow(row, entriesToAdd);
+            }
+        }
+        for (String dpid : entriesToAdd.keySet()) {
+            if (!entriesFromStorage.containsKey(dpid))
+                entriesFromStorage.put(dpid, new HashMap<String, OFFlowMod>());
+
+            List<OFFlowMod> outQueue = new ArrayList<OFFlowMod>();
+            for (String entry : entriesToAdd.get(dpid).keySet()) {
+                OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
+                OFFlowMod oldFlowMod = null;
+
+                String dpidOldFlowMod = entry2dpid.get(entry);
+                if (dpidOldFlowMod != null) {
+                    oldFlowMod = entriesFromStorage.get(dpidOldFlowMod).remove(entry);
+                }
+
+
+                if (oldFlowMod != null && newFlowMod != null) {
+
+                    if (oldFlowMod.getMatch().equals(newFlowMod.getMatch())
+                            && oldFlowMod.getCookie().equals(newFlowMod.getCookie())
+                            && oldFlowMod.getPriority() == newFlowMod.getPriority()
+                            && dpidOldFlowMod.equalsIgnoreCase(dpid)) {
+                        log.debug("ModifyStrict SFP Flow");
+                        entriesFromStorage.get(dpid).put(entry, newFlowMod);
+                        entry2dpid.put(entry, dpid);
+                        newFlowMod = FlowModUtils.toFlowModifyStrict(newFlowMod);
+                        outQueue.add(newFlowMod);
+
+                    } else {
+                        log.debug("DeleteStrict and Add SFP Flow");
+                        oldFlowMod = FlowModUtils.toFlowDeleteStrict(oldFlowMod);
+                        OFFlowAdd addTmp = FlowModUtils.toFlowAdd(newFlowMod);
+
+                        if (dpidOldFlowMod.equals(dpid)) {
+                            outQueue.add(oldFlowMod);
+                            outQueue.add(addTmp);
+
+                        } else {
+                            Verify.checkNetworkInvariant(oldFlowMod,DatapathId.of(dpidOldFlowMod));
+                            Verify.checkNetworkInvariant(FlowModUtils.toFlowAdd(newFlowMod),DatapathId.of(dpid));
+
+                        }
+                        entriesFromStorage.get(dpid).put(entry, addTmp);
+                        entry2dpid.put(entry, dpid);
+                    }
+
+                } else if (newFlowMod != null && oldFlowMod == null) {
+                    log.debug("Add SFP Flow");
+                    OFFlowAdd addTmp = FlowModUtils.toFlowAdd(newFlowMod);
+                    entriesFromStorage.get(dpid).put(entry, addTmp);
+                    entry2dpid.put(entry, dpid);
+                    outQueue.add(addTmp);
+                } else if (newFlowMod == null) {
+                    entriesFromStorage.get(dpid).remove(entry);
+                    entry2dpid.remove(entry);
+                }
+            }
+            Iterator<OFFlowMod> iter=outQueue.iterator();
+            while(iter.hasNext()){
+                OFFlowMod temp_flow_mod=iter.next();
+                log.info(temp_flow_mod.toString());
+                Verify.checkNetworkInvariant(temp_flow_mod,DatapathId.of(dpid));
+            }
+
+
+        }
     }
 
     @Override

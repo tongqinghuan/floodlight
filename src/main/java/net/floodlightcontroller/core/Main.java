@@ -52,7 +52,7 @@ public class Main {
 					// RPCServer.RPCServerRun();
 					logger.info("Thread is sleeping");
 					try {
-						TimeUnit.SECONDS.sleep(120);
+						TimeUnit.SECONDS.sleep(60);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();

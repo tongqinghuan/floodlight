@@ -239,14 +239,14 @@ public class Network implements IFloodlightModule {
 	private static void generateFlow(String src, String dst, int srcport, int dstport, DatapathId dpid,
 			String flowName) {
 		String fmJson;
-		int srcipMask=32;
-		int dstipMask=32;
+		int srcipMask=16;
+		int dstipMask=16;
 		Map<String, Object> rowValues;
 		fmJson = "{\"switch\":\"" + dpid.toString() + "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
 				+ "\", \"priority\":\"32767"
 				+ "\", \"ipv4_src\":\"" + src +"/"+srcipMask
 				+ "\", \"ipv4_dst\":\"" + dst+"/"+dstipMask
-				+ "\", \"in_port\":\"" + srcport
+				//+ "\", \"in_port\":\"" + srcport
 				+ "\", \"active\":\"true"
 				+ "\", \"instruction_goto_table\":\"1"
 				+ "\", \"idle_timeout\":\"0" + "\", \"table\":\"0"
