@@ -1,13 +1,10 @@
 package com.react.verify;
 
 
-import com.react.compiler.Flow;
-import com.react.compiler.Instruction;
-import com.react.topo.ConnectedSwitch;
-import com.react.topo.Network;
 import com.react.topo.TwoTuple;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 public class FowardingGraph {
 
@@ -164,41 +161,41 @@ public class FowardingGraph {
         return flag;
     }
 
-    public static boolean traversIntent(Flow flow) {
-        Instruction sr = SemanticRepair.flow_semantic_rules.get(
-                flow.getDestination()).get(Network.host_edgeport.get(flow.getSource()).sid);//first hop
-        String current_switch_id = sr.scope.scope.get("switch_id");
-        Map<String, ConnectedSwitch> connected_switch = Network.getConnectedSwitch(Network.switches.get(current_switch_id));
-        Set<TwoTuple<String>> art_dof = new HashSet<TwoTuple<String>>();
-
-        Set<TwoTuple<String>> forbid = new HashSet<TwoTuple<String>>();
-        Set<TwoTuple<String>> fixed_forward = new HashSet<TwoTuple<String>>();
-        Set<TwoTuple<String>> towards = new HashSet<TwoTuple<String>>();
-
-        for (TwoTuple<String> tuple : srcDstPair) {
-            String src = tuple.first;
-            String dst = tuple.second;
-
-            int pos = getPostion(src);
-            List<String> traversed = new ArrayList<String>();
-            traversed.add(src);
-            VNode vnode = vList.get(pos);
-            while (vnode.firstEdge != null
-                    && vnode.firstEdge.ivex < vList.size()) {
-                String midevice = vList
-                        .get(vnode.firstEdge.ivex).device;
-                if (traversed.contains(midevice)) {
-                    break;
-                }
-                traversed.add(midevice);
-                vnode = vList.get(vnode.firstEdge.ivex);
-            }
-            if (!vnode.device.equals(dst)) {
-
-            }
-        }
-        return false;
-    }
+//    public static boolean traversIntent(Flow flow) {
+//        Instruction sr = SemanticRepair.flow_semantic_rules.get(
+//                flow.getDestination()).get(Network.host_edgeport.get(flow.getSource()).sid);//first hop
+//        String current_switch_id = sr.scope.scope.get("switch_id");
+//        Map<String, ConnectedSwitch> connected_switch = Network.getConnectedSwitch(Network.switches.get(current_switch_id));
+//        Set<TwoTuple<String>> art_dof = new HashSet<TwoTuple<String>>();
+//
+//        Set<TwoTuple<String>> forbid = new HashSet<TwoTuple<String>>();
+//        Set<TwoTuple<String>> fixed_forward = new HashSet<TwoTuple<String>>();
+//        Set<TwoTuple<String>> towards = new HashSet<TwoTuple<String>>();
+//
+//        for (TwoTuple<String> tuple : srcDstPair) {
+//            String src = tuple.first;
+//            String dst = tuple.second;
+//
+//            int pos = getPostion(src);
+//            List<String> traversed = new ArrayList<String>();
+//            traversed.add(src);
+//            VNode vnode = vList.get(pos);
+//            while (vnode.firstEdge != null
+//                    && vnode.firstEdge.ivex < vList.size()) {
+//                String midevice = vList
+//                        .get(vnode.firstEdge.ivex).device;
+//                if (traversed.contains(midevice)) {
+//                    break;
+//                }
+//                traversed.add(midevice);
+//                vnode = vList.get(vnode.firstEdge.ivex);
+//            }
+//            if (!vnode.device.equals(dst)) {
+//
+//            }
+//        }
+//        return false;
+//    }
 
     public void traverse() {
         System.out.println("srcDstPair:" + srcDstPair.toString());

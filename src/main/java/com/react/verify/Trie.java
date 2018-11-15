@@ -4,7 +4,6 @@ import com.react.topo.Node;
 
 import java.util.ArrayList;
 import java.util.HashSet;
-import java.util.Set;
 
 public class Trie {
     private Node root = new Node("");
@@ -17,9 +16,9 @@ public class Trie {
         return flag;
     }
 
-    public void addFlowRule(String dstIp,String switchId) {
+    public void addFlowRule(EcFiled ecFiled,String switchId) {
 //		for(Flow entry:flowSet) {
-        char[] flow = dstIp.toCharArray();
+        char[] flow = ecFiled.getDst_ip().toCharArray();
         Node currentNode = root;
         for (int i = 0; i < flow.length; i++) {
             //System.out.println(currentNode.containsChild(flow[i]));
@@ -35,7 +34,7 @@ public class Trie {
         currentNode.setValue(switchId);
 //		}
     }
-    public Node getNode(String argString) {
+    public Node getLeafNode(String argString) {
         char[] nodeString = argString.toCharArray();
         Node currentNode = root;
         for (int i = 0; i < nodeString.length && currentNode != null; i++) {
@@ -44,8 +43,8 @@ public class Trie {
         return currentNode;
     }
 
-    public boolean containFlowRule(String argString) {
-        Node node = getNode(argString);
+    public boolean containFlowRule(EcFiled argString) {
+        Node node = getLeafNode(argString.getDst_ip());
         if (node != null && node.isFlow()) {
             return true;
         } else {
@@ -53,17 +52,17 @@ public class Trie {
         }
     }
 
-    public void deleteFlowRule(String entry) {
-        char[] flow = entry.toCharArray();
+    public void deleteFlowRule(EcFiled ecFiled) {
+        char[] filed = ecFiled.getDst_ip().toCharArray();
         Node currentNode = root;
-        for (int i = 0; i < flow.length && currentNode != null; i++) {
-            currentNode = currentNode.getChild(flow[i]);
+        for (int i = 0; i < filed.length && currentNode != null; i++) {
+            currentNode = currentNode.getChild(filed[i]);
         }
         currentNode.setIsFlow(false);
     }
-    public Set<EcFiled> searchConflictFlowRule(EcFiled currentFlowRule) {
+    public HashSet<EcFiled> searchConflictFlowRule(EcFiled currentFlowRule) {
 
-        Set<EcFiled> conflictFlowRules = new HashSet<EcFiled>();
+        HashSet<EcFiled> conflictFlowRules = new HashSet<EcFiled>();
         HashSet<Node> currentNodeSet = new HashSet<Node>();
         HashSet<Node> temp = new HashSet<Node>();
 //		 point to the root of the trie Tree, like a pointer

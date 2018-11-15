@@ -242,6 +242,7 @@ public class Network implements IFloodlightModule {
 		int srcipMask=16;
 		int dstipMask=16;
 		Map<String, Object> rowValues;
+
 		fmJson = "{\"switch\":\"" + dpid.toString() + "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
 				+ "\", \"priority\":\"32767"
 				+ "\", \"ipv4_src\":\"" + src +"/"+srcipMask

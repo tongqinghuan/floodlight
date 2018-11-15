@@ -1,5 +1,7 @@
 package com.react.verify;
 
+import com.react.compiler.Flow;
+import com.react.compiler.MiniCompiler;
 import net.floodlightcontroller.core.*;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
@@ -27,6 +29,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 public class FlowModIntersepting implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
@@ -142,44 +145,8 @@ public class FlowModIntersepting implements IFloodlightModule,
     protected Map<String, String> entry2dpid;
     
     public static Trie trie;
-    public static HashMap<EcFiled,FlowRuleAction>  flowruleAndActionPair;
-    class FlowRuleAction{
-        String action;
-        Integer port;
-        public FlowRuleAction(String action,Integer port){
-            this.action=action;
-            this.port=port;
-        }
-
-        public String getAction() {
-            return action;
-        }
-
-        public Integer getPort() {
-            return port;
-        }
-        @Override
-        public String toString() {
-            return "FlowRuleAction{" +
-                    "action='" + action + '\'' +
-                    ", port=" + port +
-                    '}';
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (o == null || getClass() != o.getClass()) return false;
-            FlowRuleAction that = (FlowRuleAction) o;
-            return Objects.equals(action, that.action) &&
-                    Objects.equals(port, that.port);
-        }
-
-        @Override
-        public int hashCode() {
-            return Objects.hash(action, port);
-        }
-    }
+    public static HashMap<EcFiled,FlowRule>  ecfiledFlowRulePair;
+    public static EcFiled currentEcFiled;
     @Override
     public String getName() {
         // TODO Auto-generated method stub
@@ -446,7 +413,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                     dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
                             flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
                 }
-                
+                int priority=flowMod.getPriority();
                 ecFiled=new EcFiled(dst_ip);
                 //extract actions from flow_mod
                 List<OFAction> actions = flowMod.getActions();
@@ -459,19 +426,22 @@ public class FlowModIntersepting implements IFloodlightModule,
                             break;
                     }
                 }
+                FlowRule flowRule=new FlowRule(Long.toString(id.getLong()),priority,action);
                 if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
                         flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
                         flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
                     //store  action for constructing forwarding graph
-                    if(flowruleAndActionPair==null){
-                        flowruleAndActionPair=new HashMap<>();
+                    if(ecfiledFlowRulePair==null){
+                        ecfiledFlowRulePair=new HashMap<>();
                     }
-                    flowruleAndActionPair.put(ecFiled,action);
+                    ecfiledFlowRulePair.put(ecFiled,flowRule);
                     //construct trie
                     if(trie==null){
                         trie=new Trie();
                     }
-                    trie.addFlowRule(dst_ip,Long.toString(id.getLong()));
+                    trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
+                    currentEcFiled=ecFiled;
+
                 }
             }
         }
@@ -548,11 +518,43 @@ public class FlowModIntersepting implements IFloodlightModule,
             Iterator<OFFlowMod> iter=outQueue.iterator();
             while(iter.hasNext()){
                 OFFlowMod temp_flow_mod=iter.next();
-                log.info("flowmod message");
-                log.info(temp_flow_mod.toString());
+               // log.info("flowmod message");
+               // log.info(temp_flow_mod.toString());
                 constructTrieForFlowModUpdate(temp_flow_mod,DatapathId.of(dpid));
             }
+            log.info("---Trie has been constructed---");
+            log.info("---System is updating EC---");
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        TimeUnit.SECONDS.sleep(60);
+                    } catch (InterruptedException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
 
+                    //store ECS for current flowmod update
+
+                    HashSet<EcFiled> conflictEcfiled;
+                    HashSet<EC> ecsForCurrentFlowMod;
+                    HashMap<EC,HashSet<EcFiled>> matchedEcfiledForEc;
+                    HashMap<EC,HashSet<Flow>>  matchedEcFlow=null;
+                    //search conflict rule on trie
+                    conflictEcfiled=trie.searchConflictFlowRule(currentEcFiled);
+                    //generate ecs
+                    ecsForCurrentFlowMod=ECOperations.getEC(conflictEcfiled,currentEcFiled);
+                    log.info("ecsForCurrentFlowMod:"+ecsForCurrentFlowMod.toString());
+                    //construct forwarding graph
+                    matchedEcfiledForEc=ECOperations.generate_ecmatchedecFiled(ecsForCurrentFlowMod,conflictEcfiled);
+                    log.info("matchedEcfiledForEc:"+matchedEcfiledForEc.toString());
+                    if(MiniCompiler.flows!=null){
+                        matchedEcFlow=ECOperations.generate_ecmatchedFlow(ecsForCurrentFlowMod,MiniCompiler.flows);
+                    }
+                    log.info("matchedEcFlow:"+matchedEcFlow.toString());
+
+                }
+            }).start();
 
         }
     }
@@ -614,6 +616,7 @@ public class FlowModIntersepting implements IFloodlightModule,
     @Override
     public Command receive(IOFSwitch sw, OFMessage msg, FloodlightContext cntx) {
         // TODO Auto-generated method stub
+
         return null;
     }
 
