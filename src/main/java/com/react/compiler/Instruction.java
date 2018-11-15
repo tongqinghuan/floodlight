@@ -1,11 +1,4 @@
-package com.react.verify;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
-import com.react.topo.TwoTuple;
+package com.react.compiler;
 
 public class Instruction{
 	Scope scope;
@@ -43,6 +36,30 @@ public class Instruction{
 		} else if (!scope.equals(other.scope))
 			return false;
 		return true;
+	}
+
+	public Scope getScope() {
+		return scope;
+	}
+
+	public void setScope(Scope scope) {
+		this.scope = scope;
+	}
+
+	public Constraint getConstraint() {
+		return constraint;
+	}
+
+	public void setConstraint(Constraint constraint) {
+		this.constraint = constraint;
+	}
+
+	public Annotation getAnnotation() {
+		return annotation;
+	}
+
+	public void setAnnotation(Annotation annotation) {
+		this.annotation = annotation;
 	}
 
 	public int getPriority() {

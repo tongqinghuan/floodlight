@@ -15,10 +15,6 @@ import org.slf4j.LoggerFactory;
 import com.react.topo.Network;
 import com.react.topo.Port;
 import com.react.topo.TwoTuple;
-import com.react.verify.Annotation;
-import com.react.verify.Constraint;
-import com.react.verify.Instruction;
-import com.react.verify.Scope;
 
 import net.floodlightcontroller.routing.Route;
 import net.floodlightcontroller.topology.NodePortTuple;

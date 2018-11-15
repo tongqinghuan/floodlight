@@ -1,7 +1,11 @@
 
 
-package com.react.verify;
+package com.react.com.react.semanticbasedrepair;
 
+import com.react.compiler.Annotation;
+import com.react.compiler.Constraint;
+import com.react.compiler.Instruction;
+import com.react.compiler.Scope;
 import com.react.topo.ConnectedSwitch;
 import com.react.topo.Network;
 import com.react.topo.Port;
@@ -18,7 +22,7 @@ public class SemanticRepair {
     public static HashMap<String, HashMap<String, Instruction>> flow_semantic_rules = new HashMap<String, HashMap<String, Instruction>>();
 
     public static boolean semanticRepair(Instruction semantic_rules, Set<TwoTuple<String>> dof, int count) {
-        String current_switch_id = semantic_rules.scope.scope.get("switch_id");
+        String current_switch_id = (String)semantic_rules.getScope().getScope().get("switch_id");
         Map<String, ConnectedSwitch> connected_switch = Network.getConnectedSwitch(Network.switches.get(current_switch_id));
         Set<TwoTuple<String>> art_dof = new HashSet<TwoTuple<String>>();
 
@@ -26,8 +30,8 @@ public class SemanticRepair {
         Set<TwoTuple<String>> fixed_forward = new HashSet<TwoTuple<String>>();
         Set<TwoTuple<String>> towards = new HashSet<TwoTuple<String>>();
         //System.out.println("semantic_rules"+semantic_rules);
-        art_dof.addAll(semantic_rules.annotation.annotation);
-        int maxhops = semantic_rules.constraint.hop;
+        art_dof.addAll(semantic_rules.getAnnotation().annotation);
+        int maxhops = semantic_rules.getConstraint().getHop();
 
         if (dof != null) {
             art_dof.addAll(dof);
@@ -70,13 +74,13 @@ public class SemanticRepair {
                     break;
                 }
                 Set<TwoTuple<String>> next_dof = new HashSet<TwoTuple<String>>();
-                String dst_ip = semantic_rules.scope.scope.get("dst_ip");
+                String dst_ip = (String)semantic_rules.getScope().getScope().get("dst_ip");
                 //System.out.println(dst_ip);
                 //System.out.println(sw.sid);
                 //System.out.println(flow_semantic_rules);
                 Instruction ins = flow_semantic_rules.get(dst_ip).get(sw.sid);
                 if (ins == null) {
-                    ins = new Instruction(new Scope(sw.sid, semantic_rules.scope.scope.get("dst_ip")), new Constraint(), new Annotation());
+                    ins = new Instruction(new Scope(sw.sid, (String)semantic_rules.getScope().getScope().get("dst_ip")), new Constraint(), new Annotation());
                 }
 
                 //System.out.println("next_dof"+next_dof);
@@ -92,13 +96,13 @@ public class SemanticRepair {
                     if (final_result) {
                         HashMap<String, Integer> new_action = new HashMap<String, Integer>();
                         new_action.put("forward", sw.pid);
-                        semantic_rules.constraint.setAction(new_action);
+                        semantic_rules.getConstraint().setAction(new_action);
                         Set<TwoTuple<String>> new_dofs = new HashSet<TwoTuple<String>>();
                         new_dofs.addAll(towards);
                         new_dofs.addAll(fixed_forward);
                         new_dofs.addAll(forbid);
 //						new_dofs.add(new TwoTuple("forbid",current_switch_id));
-                        semantic_rules.annotation.annotation = new_dofs;
+                        semantic_rules.getAnnotation().annotation = new_dofs;
                         //System.out.println(ins);
                         new_flow_semantic_rules.add(semantic_rules);
                         return true;

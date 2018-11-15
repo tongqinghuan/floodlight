@@ -17,9 +17,9 @@ public class Trie {
         return flag;
     }
 
-    public void addFlow(Flow entry) {
+    public void addFlowRule(String dstIp,String switchId) {
 //		for(Flow entry:flowSet) {
-        char[] flow = entry.dst_ip.toCharArray();
+        char[] flow = dstIp.toCharArray();
         Node currentNode = root;
         for (int i = 0; i < flow.length; i++) {
             //System.out.println(currentNode.containsChild(flow[i]));
@@ -32,40 +32,9 @@ public class Trie {
         }
 //			set the last node as leaf node
         currentNode.setIsFlow(true);
+        currentNode.setValue(switchId);
 //		}
     }
-
-    public void addFlow(Set<Flow> flowSet) {
-        for (Flow entry : flowSet) {
-            char[] flow = entry.dst_ip.toCharArray();
-            Node currentNode = root;
-            for (int i = 0; i < flow.length; i++) {
-                //System.out.println(currentNode.containsChild(flow[i]));
-                if (!(currentNode.containsChild(flow[i]))) {
-                    currentNode.addChild(flow[i], new Node(currentNode.toString() + flow[i]));
-                }
-                currentNode = currentNode.getChild(flow[i]);
-            }
-            currentNode.setIsFlow(true);
-        }
-    }
-
-    public static Set<String> FlowSet2StringSet(Set<Flow> flow) {
-        Set<String> r = new HashSet<>();
-        for (Flow s : flow) {
-            r.add(s.dst_ip);
-        }
-        return r;
-    }
-
-    public static Set<Flow> StringSet2FlowSet(Set<String> flow) {
-        Set<Flow> r = new HashSet<>();
-        for (String s : flow) {
-            r.add(new Flow(s));
-        }
-        return r;
-    }
-
     public Node getNode(String argString) {
         char[] nodeString = argString.toCharArray();
         Node currentNode = root;
@@ -75,7 +44,7 @@ public class Trie {
         return currentNode;
     }
 
-    public boolean containFlow(String argString) {
+    public boolean containFlowRule(String argString) {
         Node node = getNode(argString);
         if (node != null && node.isFlow()) {
             return true;
@@ -84,7 +53,7 @@ public class Trie {
         }
     }
 
-    public void deleteFlow(String entry) {
+    public void deleteFlowRule(String entry) {
         char[] flow = entry.toCharArray();
         Node currentNode = root;
         for (int i = 0; i < flow.length && currentNode != null; i++) {
@@ -92,29 +61,16 @@ public class Trie {
         }
         currentNode.setIsFlow(false);
     }
+    public Set<EcFiled> searchConflictFlowRule(EcFiled currentFlowRule) {
 
-    public void deleteFlow(Set<String> flowSet) {
-        for (String entry : flowSet) {
-            char[] flow = entry.toCharArray();
-            Node currentNode = root;
-            for (int i = 0; i < flow.length && currentNode != null; i++) {
-                currentNode = currentNode.getChild(flow[i]);
-            }
-            currentNode.setIsFlow(false);
-
-        }
-    }
-
-    public Set<Flow> searchConflictFlow(Flow currentFlow) {
-
-        Set<Flow> conflictFlow = new HashSet<Flow>();
+        Set<EcFiled> conflictFlowRules = new HashSet<EcFiled>();
         HashSet<Node> currentNodeSet = new HashSet<Node>();
         HashSet<Node> temp = new HashSet<Node>();
 //		 point to the root of the trie Tree, like a pointer
         currentNodeSet.add(root);
-        char[] flow = currentFlow.dst_ip.toCharArray();
+        char[] flow = currentFlowRule.dst_ip.toCharArray();
 
-        for (int i = 0; i < currentFlow.dst_ip.length() && currentNodeSet != null; i++) {
+        for (int i = 0; i < currentFlowRule.dst_ip.length() && currentNodeSet != null; i++) {
 //		 	each character of flow maps a tier of tree
             ArrayList branches = new ArrayList();
 
@@ -160,9 +116,9 @@ public class Trie {
         for (Node node : currentNodeSet) {
 //		 	IsLeafNode
             if (node.isFlow()) {
-                conflictFlow.add(new Flow(node.toString()));
+                conflictFlowRules.add(new EcFiled(node.toString()));
             }
         }
-        return conflictFlow;
+        return conflictFlowRules;
     }
 }

@@ -1,4 +1,4 @@
-package com.react.verify;
+package com.react.compiler;
 
 import java.util.Arrays;
 import java.util.HashMap;

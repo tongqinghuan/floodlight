@@ -1,4 +1,4 @@
-package com.react.verify;
+package com.react.compiler;
 
 import java.util.HashMap;
 import java.util.List;
@@ -33,6 +33,14 @@ public class Constraint {
 
     public void setAction(HashMap<String, Integer> action) {
         this.action = action;
+    }
+
+    public int getHop() {
+        return hop;
+    }
+
+    public void setHop(int hop) {
+        this.hop = hop;
     }
 
     @Override

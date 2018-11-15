@@ -11,8 +11,14 @@ import net.floodlightcontroller.storage.IResultSet;
 import net.floodlightcontroller.storage.IStorageSourceListener;
 import net.floodlightcontroller.storage.IStorageSourceService;
 import net.floodlightcontroller.storage.StorageException;
-import net.floodlightcontroller.util.*;
+import net.floodlightcontroller.util.ActionUtils;
+import net.floodlightcontroller.util.FlowModUtils;
+import net.floodlightcontroller.util.InstructionUtils;
+import net.floodlightcontroller.util.MatchUtils;
 import org.projectfloodlight.openflow.protocol.*;
+import org.projectfloodlight.openflow.protocol.action.OFAction;
+import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.TableId;
 import org.projectfloodlight.openflow.types.U16;
@@ -22,10 +28,10 @@ import org.slf4j.LoggerFactory;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
-public class Veriflow implements IFloodlightModule,
+public class FlowModIntersepting implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
 
-    protected static Logger log = LoggerFactory.getLogger(Veriflow.class);
+    protected static Logger log = LoggerFactory.getLogger(FlowModIntersepting.class);
 
     public static final String TABLE_NAME = "controller_staticflowtableentry";
     public static final String COLUMN_NAME = "name";
@@ -134,7 +140,46 @@ public class Veriflow implements IFloodlightModule,
 
     protected Map<String, Map<String, OFFlowMod>> entriesFromStorage;
     protected Map<String, String> entry2dpid;
+    
+    public static Trie trie;
+    public static HashMap<EcFiled,FlowRuleAction>  flowruleAndActionPair;
+    class FlowRuleAction{
+        String action;
+        Integer port;
+        public FlowRuleAction(String action,Integer port){
+            this.action=action;
+            this.port=port;
+        }
 
+        public String getAction() {
+            return action;
+        }
+
+        public Integer getPort() {
+            return port;
+        }
+        @Override
+        public String toString() {
+            return "FlowRuleAction{" +
+                    "action='" + action + '\'' +
+                    ", port=" + port +
+                    '}';
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (o == null || getClass() != o.getClass()) return false;
+            FlowRuleAction that = (FlowRuleAction) o;
+            return Objects.equals(action, that.action) &&
+                    Objects.equals(port, that.port);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(action, port);
+        }
+    }
     @Override
     public String getName() {
         // TODO Auto-generated method stub
@@ -335,7 +380,36 @@ public class Veriflow implements IFloodlightModule,
 
         entries.get(switchName).put(entryName, fmb.build()); // add the FlowMod message to the table
     }
+    
+    public static int NumberOf1(int n) {
+        if (n == 0) {
+            return 0;
+        }
+        int count = 0;
+        while (n != 0) {
+            n = n & (n-1);
+            count++;
+        }
+        return count;
+    }
 
+    public  int getMaskLength(String mask){
+        if(mask==null){
+            return 32;
+        }
+        String[] ipStrs=mask.split("\\.");
+        int mask_length=0;
+        for(int i=0;i<4;i++){
+            if(Integer.parseInt(ipStrs[i])==0){
+                continue;
+            }
+            mask_length+=NumberOf1(Integer.parseInt(ipStrs[i]));
+
+        }
+        return mask_length;
+
+
+    }
 
     /**
      * generate IPwithNetmask
@@ -344,7 +418,7 @@ public class Veriflow implements IFloodlightModule,
      * @param masklength
      * @return String IPwithNetmask
      */
-    public static String ipInt2String(int ipAddress, int masklength) {
+    public  String ipInt2String(int ipAddress, int masklength) {
         StringBuffer stringBuffer = new StringBuffer();
         int i = 0;
         for (; i < 31 - Integer.toBinaryString(ipAddress).length(); i++) {
@@ -355,14 +429,56 @@ public class Veriflow implements IFloodlightModule,
         while (stringBuffer.length() != 31) {
             stringBuffer.append('x');
         }
-
         return stringBuffer.toString();
     }
-
+    
+    public void constructTrieForFlowModUpdate(OFFlowMod flowMod,DatapathId id){
+        EcFiled ecFiled=null;
+        FlowRuleAction action=null;
+        if (flowMod != null && flowMod.getMatch() != null) {
+            if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
+                String dst_ip;
+                if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                    dst_ip = ipInt2String(
+                            flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),getMaskLength(flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
+                    log.info("dst_ip:"+dst_ip);
+                } else {
+                    dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
+                            flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                }
+                
+                ecFiled=new EcFiled(dst_ip);
+                //extract actions from flow_mod
+                List<OFAction> actions = flowMod.getActions();
+                for (OFAction a : actions) {
+                    switch (a.getType()) {
+                        case OUTPUT:
+                            action=new FlowRuleAction("forward",(((OFActionOutput) a).getPort().getPortNumber()));
+                            break;
+                        case SET_FIELD:
+                            break;
+                    }
+                }
+                if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
+                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
+                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
+                    //store  action for constructing forwarding graph
+                    if(flowruleAndActionPair==null){
+                        flowruleAndActionPair=new HashMap<>();
+                    }
+                    flowruleAndActionPair.put(ecFiled,action);
+                    //construct trie
+                    if(trie==null){
+                        trie=new Trie();
+                    }
+                    trie.addFlowRule(dst_ip,Long.toString(id.getLong()));
+                }
+            }
+        }
+    }
     @Override
     public void rowsModified(String tableName, Set<Object> rowKeys){
         //flow rules insert/update
-        log.debug("Modifying Table {}", tableName);
         HashMap<String, Map<String, OFFlowMod>> entriesToAdd =
                 new HashMap<String, Map<String, OFFlowMod>>();
         for (Object key: rowKeys) {
@@ -410,8 +526,8 @@ public class Veriflow implements IFloodlightModule,
                             outQueue.add(addTmp);
 
                         } else {
-                            Verify.checkNetworkInvariant(oldFlowMod,DatapathId.of(dpidOldFlowMod));
-                            Verify.checkNetworkInvariant(FlowModUtils.toFlowAdd(newFlowMod),DatapathId.of(dpid));
+                            constructTrieForFlowModUpdate(oldFlowMod,DatapathId.of(dpidOldFlowMod));
+                            constructTrieForFlowModUpdate(FlowModUtils.toFlowAdd(newFlowMod),DatapathId.of(dpid));
 
                         }
                         entriesFromStorage.get(dpid).put(entry, addTmp);
@@ -432,8 +548,9 @@ public class Veriflow implements IFloodlightModule,
             Iterator<OFFlowMod> iter=outQueue.iterator();
             while(iter.hasNext()){
                 OFFlowMod temp_flow_mod=iter.next();
+                log.info("flowmod message");
                 log.info(temp_flow_mod.toString());
-                Verify.checkNetworkInvariant(temp_flow_mod,DatapathId.of(dpid));
+                constructTrieForFlowModUpdate(temp_flow_mod,DatapathId.of(dpid));
             }
 
 
@@ -459,7 +576,7 @@ public class Veriflow implements IFloodlightModule,
             for (String entry : entriesToAdd.get(dpid).keySet()) {
                 //	System.out.println(Long.toString(DatapathId.of(dpid).getLong()));
                 OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
-                Verify.checkNetworkInvariant(newFlowMod, DatapathId.of(dpid));
+                constructTrieForFlowModUpdate(newFlowMod, DatapathId.of(dpid));
             }
         }
     }
