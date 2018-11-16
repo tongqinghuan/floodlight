@@ -1,7 +1,6 @@
 package com.react.verify;
 
-import com.react.compiler.Flow;
-import com.react.compiler.MiniCompiler;
+import com.react.compiler.Instruction;
 import net.floodlightcontroller.core.*;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
@@ -29,7 +28,9 @@ import org.slf4j.LoggerFactory;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 public class FlowModIntersepting implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
@@ -143,7 +144,9 @@ public class FlowModIntersepting implements IFloodlightModule,
 
     protected Map<String, Map<String, OFFlowMod>> entriesFromStorage;
     protected Map<String, String> entry2dpid;
-    
+
+    public static ExecutorService verifyAndRepair;
+    public static ArrayList<Future<List<Instruction>>> repairedRes=new ArrayList<>();
     public static Trie trie;
     public static HashMap<EcFiled,FlowRule>  ecfiledFlowRulePair;
     public static EcFiled currentEcFiled;
@@ -398,7 +401,31 @@ public class FlowModIntersepting implements IFloodlightModule,
         }
         return stringBuffer.toString();
     }
-    
+    public void constructTrieForFlowModDelete(OFFlowMod delete){
+        EcFiled ecFiled=null;
+        if (delete != null && delete.getMatch() != null) {
+            if (delete.getMatch().get(MatchField.IPV4_DST) != null) {
+                String dst_ip;
+                if (!delete.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                    dst_ip = ipInt2String(
+                            delete.getMatch().get(MatchField.IPV4_DST).getInt(), getMaskLength(flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
+                    log.info("dst_ip:" + dst_ip);
+                } else {
+                    dst_ip = ipInt2String(delete.getMatch().get(MatchField.IPV4_DST).getInt(),
+                            delete.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                }
+                ecFiled=new EcFiled(dst_ip);
+                if(delete.getCommand().equals(OFFlowModCommand.DELETE)||delete.getCommand().equals(OFFlowModCommand.DELETE_STRICT)){
+                    ecfiledFlowRulePair.remove(ecFiled);
+                    trie.deleteFlowRule(ecFiled);
+                    currentEcFiled=ecFiled;
+                }
+            }
+        }
+
+
+
+    }
     public void constructTrieForFlowModUpdate(OFFlowMod flowMod,DatapathId id){
         EcFiled ecFiled=null;
         FlowRuleAction action=null;
@@ -436,6 +463,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                     }
                     ecfiledFlowRulePair.put(ecFiled,flowRule);
                     //construct trie
+                    log.info("---System is constructing trie with updated flowmod---");
                     if(trie==null){
                         trie=new Trie();
                     }
@@ -480,14 +508,14 @@ public class FlowModIntersepting implements IFloodlightModule,
                             && oldFlowMod.getCookie().equals(newFlowMod.getCookie())
                             && oldFlowMod.getPriority() == newFlowMod.getPriority()
                             && dpidOldFlowMod.equalsIgnoreCase(dpid)) {
-                        log.debug("ModifyStrict SFP Flow");
+                        //log.debug("ModifyStrict SFP Flow");
                         entriesFromStorage.get(dpid).put(entry, newFlowMod);
                         entry2dpid.put(entry, dpid);
                         newFlowMod = FlowModUtils.toFlowModifyStrict(newFlowMod);
                         outQueue.add(newFlowMod);
 
                     } else {
-                        log.debug("DeleteStrict and Add SFP Flow");
+                        //log.debug("DeleteStrict and Add SFP Flow");
                         oldFlowMod = FlowModUtils.toFlowDeleteStrict(oldFlowMod);
                         OFFlowAdd addTmp = FlowModUtils.toFlowAdd(newFlowMod);
 
@@ -505,7 +533,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                     }
 
                 } else if (newFlowMod != null && oldFlowMod == null) {
-                    log.debug("Add SFP Flow");
+                    //log.debug("Add SFP Flow");
                     OFFlowAdd addTmp = FlowModUtils.toFlowAdd(newFlowMod);
                     entriesFromStorage.get(dpid).put(entry, addTmp);
                     entry2dpid.put(entry, dpid);
@@ -522,64 +550,50 @@ public class FlowModIntersepting implements IFloodlightModule,
                // log.info(temp_flow_mod.toString());
                 constructTrieForFlowModUpdate(temp_flow_mod,DatapathId.of(dpid));
             }
-            log.info("---Trie has been constructed---");
-            log.info("---System is updating EC---");
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        TimeUnit.SECONDS.sleep(60);
-                    } catch (InterruptedException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-
-                    //store ECS for current flowmod update
-
-                    HashSet<EcFiled> conflictEcfiled;
-                    HashSet<EC> ecsForCurrentFlowMod;
-                    HashMap<EC,HashSet<EcFiled>> matchedEcfiledForEc;
-                    HashMap<EC,HashSet<Flow>>  matchedEcFlow=null;
-                    //search conflict rule on trie
-                    conflictEcfiled=trie.searchConflictFlowRule(currentEcFiled);
-                    //generate ecs
-                    ecsForCurrentFlowMod=ECOperations.getEC(conflictEcfiled,currentEcFiled);
-                    log.info("ecsForCurrentFlowMod:"+ecsForCurrentFlowMod.toString());
-                    //construct forwarding graph
-                    matchedEcfiledForEc=ECOperations.generate_ecmatchedecFiled(ecsForCurrentFlowMod,conflictEcfiled);
-                    log.info("matchedEcfiledForEc:"+matchedEcfiledForEc.toString());
-                    if(MiniCompiler.flows!=null){
-                        matchedEcFlow=ECOperations.generate_ecmatchedFlow(ecsForCurrentFlowMod,MiniCompiler.flows);
-                    }
-                    log.info("matchedEcFlow:"+matchedEcFlow.toString());
-
-                }
-            }).start();
-
+            log.info("---System is creating task to do verifying and repairing---");
+            if(verifyAndRepair==null){
+                verifyAndRepair= Executors.newCachedThreadPool();
+            }
+            Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
+            repairedRes.add(res);
         }
     }
+    private void deleteStaticFlowEntry(String entryName) {
+        String dpid = entry2dpid.remove(entryName);
 
+        if (dpid == null) {
+            return;
+        }
+        // send flow_mod delete
+        if (switchService.getSwitch(DatapathId.of(dpid)) != null) {
+            OFFlowMod delete=entriesFromStorage.get(dpid).get(entryName);
+            if (entriesFromStorage.containsKey(dpid) && entriesFromStorage.get(dpid).containsKey(entryName)) {
+                entriesFromStorage.get(dpid).remove(entryName);
+            } else {
+                log.debug("Tried to delete non-existent entry {} for switch {}", entryName, dpid);
+                return;
+            }
+            log.info("delete flow_mod :"+delete.toString());
+            constructTrieForFlowModDelete(delete);
+        } else {
+            log.debug("Not sending flow delete for disconnected switch.");
+        }
+        return;
+    }
     @Override
     public void rowsDeleted(String tableName, Set<Object> rowKeys) {
-        // TODO Auto-generated method stub
-        HashMap<String, Map<String, OFFlowMod>> entriesToAdd = new HashMap<String, Map<String, OFFlowMod>>();
-
-        // build up list of what was added
-        for (Object key : rowKeys) {
-            IResultSet resultSet = storageSourceService.getRow(tableName, key);
-            Iterator<IResultSet> it = resultSet.iterator();
-            while (it.hasNext()) {
-                Map<String, Object> row = it.next().getRow();
-                parseRow(row, entriesToAdd);
+        for(Object obj : rowKeys) {
+            if (!(obj instanceof String)) {
+                log.debug("Tried to delete non-string key {}; ignoring", obj);
+                continue;
             }
-        }
-
-        for (String dpid : entriesToAdd.keySet()) {
-            for (String entry : entriesToAdd.get(dpid).keySet()) {
-                //	System.out.println(Long.toString(DatapathId.of(dpid).getLong()));
-                OFFlowMod newFlowMod = entriesToAdd.get(dpid).get(entry);
-                constructTrieForFlowModUpdate(newFlowMod, DatapathId.of(dpid));
+            deleteStaticFlowEntry((String) obj);
+            log.info("---System is creating task to do verifying and repairing---");
+            if(verifyAndRepair==null){
+                verifyAndRepair= Executors.newCachedThreadPool();
             }
+            Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
+            repairedRes.add(res);
         }
     }
 
