@@ -17,19 +17,7 @@
 
 package net.floodlightcontroller.forwarding;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-
-import net.floodlightcontroller.core.FloodlightContext;
-import net.floodlightcontroller.core.IFloodlightProviderService;
-import net.floodlightcontroller.core.IOFSwitch;
-import net.floodlightcontroller.core.IOFSwitchListener;
-import net.floodlightcontroller.core.PortChangeType;
+import net.floodlightcontroller.core.*;
 import net.floodlightcontroller.core.internal.IOFSwitchService;
 import net.floodlightcontroller.core.module.FloodlightModuleContext;
 import net.floodlightcontroller.core.module.FloodlightModuleException;
@@ -40,11 +28,7 @@ import net.floodlightcontroller.debugcounter.IDebugCounterService;
 import net.floodlightcontroller.devicemanager.IDevice;
 import net.floodlightcontroller.devicemanager.IDeviceService;
 import net.floodlightcontroller.devicemanager.SwitchPort;
-import net.floodlightcontroller.packet.Ethernet;
-import net.floodlightcontroller.packet.IPv4;
-import net.floodlightcontroller.packet.IPv6;
-import net.floodlightcontroller.packet.TCP;
-import net.floodlightcontroller.packet.UDP;
+import net.floodlightcontroller.packet.*;
 import net.floodlightcontroller.routing.ForwardingBase;
 import net.floodlightcontroller.routing.IRoutingDecision;
 import net.floodlightcontroller.routing.IRoutingService;
@@ -55,32 +39,16 @@ import net.floodlightcontroller.util.FlowModUtils;
 import net.floodlightcontroller.util.OFDPAUtils;
 import net.floodlightcontroller.util.OFPortMode;
 import net.floodlightcontroller.util.OFPortModeTuple;
-
-import org.projectfloodlight.openflow.protocol.OFFlowMod;
-import org.projectfloodlight.openflow.protocol.OFFlowModCommand;
-import org.projectfloodlight.openflow.protocol.OFGroupType;
-import org.projectfloodlight.openflow.protocol.OFPacketIn;
-import org.projectfloodlight.openflow.protocol.OFPacketOut;
-import org.projectfloodlight.openflow.protocol.OFPortDesc;
-import org.projectfloodlight.openflow.protocol.OFVersion;
+import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
-import org.projectfloodlight.openflow.types.DatapathId;
-import org.projectfloodlight.openflow.types.EthType;
-import org.projectfloodlight.openflow.types.IPv4Address;
-import org.projectfloodlight.openflow.types.IPv6Address;
-import org.projectfloodlight.openflow.types.IpProtocol;
-import org.projectfloodlight.openflow.types.MacAddress;
-import org.projectfloodlight.openflow.types.OFBufferId;
-import org.projectfloodlight.openflow.types.OFGroup;
-import org.projectfloodlight.openflow.types.OFPort;
-import org.projectfloodlight.openflow.types.OFVlanVidMatch;
-import org.projectfloodlight.openflow.types.TableId;
-import org.projectfloodlight.openflow.types.U64;
-import org.projectfloodlight.openflow.types.VlanVid;
+import org.projectfloodlight.openflow.types.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.IOException;
+import java.util.*;
 
 public class Forwarding extends ForwardingBase implements IFloodlightModule, IOFSwitchListener {
 	protected static Logger log = LoggerFactory.getLogger(Forwarding.class);
@@ -160,16 +128,20 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 		OFPort inPort = (pi.getVersion().compareTo(OFVersion.OF_12) < 0 ? pi.getInPort() : pi.getMatch().get(MatchField.IN_PORT));
 		IDevice dstDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_DST_DEVICE);
 		DatapathId source = sw.getId();
+
+
 				
 		if (dstDevice != null) {
+
 			IDevice srcDevice = IDeviceService.fcStore.get(cntx, IDeviceService.CONTEXT_SRC_DEVICE);
+
 
 			if (srcDevice == null) {
 				log.error("No device entry found for source device. Is the device manager running? If so, report bug.");
 				return;
 			}
 			
-			if (FLOOD_ALL_ARP_PACKETS && 
+			if (FLOOD_ALL_ARP_PACKETS &&
 					IFloodlightProviderService.bcStore.get(cntx, IFloodlightProviderService.CONTEXT_PI_PAYLOAD).getEtherType() 
 					== EthType.ARP) {
 				log.debug("ARP flows disabled in Forwarding. Flooding ARP packet");
@@ -229,9 +201,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 				log.debug("Packet destination is known, but packet was not received on an edge port (rx on {}/{}). Flooding packet", source, inPort);
 				doFlood(sw, pi, cntx);
 				return; 
-			}				
-			
-			Route route = routingEngineService.getRoute(source, 
+			}
+			Route route = routingEngineService.getRoute(source,
 					inPort,
 					dstDap.getSwitchDPID(),
 					dstDap.getPort(), U64.of(0)); //cookie = 0, i.e., default route
@@ -250,7 +221,8 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 				log.debug("Cretaing flow rules on the route, match rule: {}", m);
 				pushRoute(route, m, pi, sw.getId(), cookie, 
 						cntx, requestFlowRemovedNotifn,
-						OFFlowModCommand.ADD);	
+						OFFlowModCommand.ADD);
+				//MiniCompiler.installFlowRules(flow,route);
 			} else {
 				/* Route traverses no links --> src/dst devices on same switch */
 				log.debug("Could not compute route. Devices should be on same switch src={} and dst={}", srcDevice, dstDevice);
@@ -264,6 +236,7 @@ public class Forwarding extends ForwardingBase implements IFloodlightModule, IOF
 				pushRoute(r, m, pi, sw.getId(), cookie,
 						cntx, requestFlowRemovedNotifn,
 						OFFlowModCommand.ADD);
+				//MiniCompiler.installFlowRules(flow,route);
 			}
 		} else {
 			log.debug("Destination unknown. Flooding packet");

@@ -1,23 +1,16 @@
 package com.react.compiler;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-
+import com.react.topo.Network;
+import com.react.topo.Port;
+import com.react.topo.TwoTuple;
+import net.floodlightcontroller.routing.Route;
+import net.floodlightcontroller.topology.NodePortTuple;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.OFPort;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import com.react.topo.Network;
-import com.react.topo.Port;
-import com.react.topo.TwoTuple;
-
-import net.floodlightcontroller.routing.Route;
-import net.floodlightcontroller.topology.NodePortTuple;
+import java.util.*;
 
 public class MiniCompiler {
 
@@ -45,20 +38,12 @@ public class MiniCompiler {
 			Port dstp = Network.host_edgeport.get(dstIp);
 			String srcDpid = srcp.sid;
 			String dstDpid = dstp.sid;
-
 			entry_exit_flow.put(flow, new EnAndExEntry(srcDpid, dstDpid));
-
-			// create route
-			Route some_route = new Route(DatapathId.of(srcDpid), DatapathId.of(dstDpid));
-			// cal path
-			route_list.add(new NodePortTuple(DatapathId.of(srcp.sid), OFPort.ofInt(srcp.pid)));
-			logger.info("srcdpid+dstdpid:" + srcDpid + "," + dstDpid);
-			Route temp = Network.calculateAllShortestPaths(srcDpid, dstDpid);
-			logger.info(temp.toString());
-			route_list.addAll(temp.getPath());
-			route_list.add(new NodePortTuple(DatapathId.of(dstp.sid), OFPort.ofInt(dstp.pid)));
-			some_route.getPath().addAll(route_list);
-			route.put(flow, some_route);
+			logger.info("system is calculating path for flow:"+srcIp+"--->"+dstIp);
+			Route temp = Network.calculateAllShortestPaths(srcIp, dstIp);
+			if(temp!=null){
+				route.put(flow, temp);
+			}
 		}
 		for (Map.Entry<Flow, Route> entry : route.entrySet()) {
 			logger.info(entry.getKey().getSource() + "," + entry.getKey().getDestination() + ":"
@@ -123,21 +108,24 @@ public class MiniCompiler {
 
 	}
 
-	public static void installFlowRules() {
-		if (route == null || route.size() == 0) {
-			logger.info("---there is something with routing----");
+
+	public static void installFlowRules( ) {
+		if(route==null||route.size()==0){
+			return;
 		}
-		for (Map.Entry<Flow, Route> entry : route.entrySet()) {
-			Network.install_rules(entry.getValue(), entry.getKey());
+
+		for(Map.Entry<Flow,Route> entry:route.entrySet()){
+			logger.info("---MiniCompiler---"+entry.getKey().toString());
+			Network.install_rules(entry.getValue(),entry.getKey());
 		}
 
 	}
-
-	public static void installRules() {
+	public static void installRules(){
 		installPathByIntent();
 		installFlowRules();
-		installSemanticRules();
+
 
 	}
+
 
 }

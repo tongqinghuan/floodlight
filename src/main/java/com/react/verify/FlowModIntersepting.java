@@ -408,7 +408,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                 String dst_ip;
                 if (!delete.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
                     dst_ip = ipInt2String(
-                            delete.getMatch().get(MatchField.IPV4_DST).getInt(), getMaskLength(flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
+                            delete.getMatch().get(MatchField.IPV4_DST).getInt(), getMaskLength(delete.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
                     log.info("dst_ip:" + dst_ip);
                 } else {
                     dst_ip = ipInt2String(delete.getMatch().get(MatchField.IPV4_DST).getInt(),
@@ -430,50 +430,58 @@ public class FlowModIntersepting implements IFloodlightModule,
         EcFiled ecFiled=null;
         FlowRuleAction action=null;
         if (flowMod != null && flowMod.getMatch() != null) {
+            String dst_ip;
             if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
-                String dst_ip;
-                if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
-                    dst_ip = ipInt2String(
-                            flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),getMaskLength(flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
-                    log.info("dst_ip:"+dst_ip);
-                } else {
-                    dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
-                            flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
-                }
-                int priority=flowMod.getPriority();
-                ecFiled=new EcFiled(dst_ip);
-                //extract actions from flow_mod
-                List<OFAction> actions = flowMod.getActions();
-                for (OFAction a : actions) {
-                    switch (a.getType()) {
-                        case OUTPUT:
-                            action=new FlowRuleAction("forward",(((OFActionOutput) a).getPort().getPortNumber()));
-                            break;
-                        case SET_FIELD:
-                            break;
-                    }
-                }
-                FlowRule flowRule=new FlowRule(Long.toString(id.getLong()),priority,action);
-                if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
-                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
-                        flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
-                    //store  action for constructing forwarding graph
-                    if(ecfiledFlowRulePair==null){
-                        ecfiledFlowRulePair=new HashMap<>();
-                    }
-                    ecfiledFlowRulePair.put(ecFiled,flowRule);
-                    //construct trie
-                    log.info("---System is constructing trie with updated flowmod---");
-                    if(trie==null){
-                        trie=new Trie();
-                    }
-                    trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
-                    currentEcFiled=ecFiled;
 
+                if (flowMod != null && flowMod.getMatch() != null) {
+                    if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
+                        if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                            dst_ip = ipInt2String(
+                                    flowMod.getMatch().get(MatchField.IPV4_DST).getInt(), 32);
+                        } else {
+                            dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
+                                    flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                        }
+                        int priority=flowMod.getPriority();
+                        ecFiled=new EcFiled(dst_ip);
+                        //extract actions from flow_mod
+                        List<OFAction> actions = flowMod.getActions();
+                        for (OFAction a : actions) {
+                            switch (a.getType()) {
+                                case OUTPUT:
+                                    action=new FlowRuleAction("forward",(((OFActionOutput) a).getPort().getPortNumber()));
+                                    break;
+                                case SET_FIELD:
+                                    break;
+                            }
+                        }
+                        FlowRule flowRule=new FlowRule(Long.toString(id.getLong()),priority,action);
+                        if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
+                                flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
+                                flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
+                            //store  action for constructing forwarding graph
+                            if(ecfiledFlowRulePair==null){
+                                ecfiledFlowRulePair=new HashMap<>();
+                            }
+                            ecfiledFlowRulePair.put(ecFiled,flowRule);
+                            //construct trie
+                            log.info("---System is constructing trie with updated flowmod---");
+                            if(trie==null){
+                                trie=new Trie();
+                            }
+                            trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
+                            currentEcFiled=ecFiled;
+
+                        }
+
+                    }
                 }
+
+            }
+
             }
         }
-    }
+
     @Override
     public void rowsModified(String tableName, Set<Object> rowKeys){
         //flow rules insert/update

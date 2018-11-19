@@ -32,7 +32,6 @@ import org.slf4j.LoggerFactory;
 import java.util.concurrent.TimeUnit;
 
 
-
 /**
  * Host for the Floodlight main method
  * @author alexreimers
@@ -52,7 +51,7 @@ public class Main {
 					// RPCServer.RPCServerRun();
 					logger.info("Thread is sleeping");
 					try {
-						TimeUnit.SECONDS.sleep(60);
+						TimeUnit.SECONDS.sleep(30);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -65,6 +64,7 @@ public class Main {
 					Network.printEdge_ports();
 					Network.printEdgeHosts();
 					MiniCompiler.installRules();
+
 				}
 			}).start();
 			// Setup logger
