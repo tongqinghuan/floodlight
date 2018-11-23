@@ -185,7 +185,7 @@ public class Network implements IFloodlightModule, IOFMessageListener {
 						paths.get(index).getPortId().getPortNumber(),
 						Integer.toString(paths.get(index + 1).getPortId().getPortNumber()),
 						paths.get(index).getNodeId(),
-						"FR_" + Integer.toString(++flow_counter));
+						"FR_" + Integer.toString(++flow_counter),32,32,32767,true);
 
 //                generateFlow(null, null,
 //                        ip_mac.get(flow.getSource().toString()), ip_mac.get(flow.getDestination().toString()),
@@ -211,7 +211,7 @@ public class Network implements IFloodlightModule, IOFMessageListener {
 						paths.get(index + 1).getPortId().getPortNumber(),
 						Integer.toString(paths.get(index).getPortId().getPortNumber()),
 						paths.get(index).getNodeId(),
-						"FR_" + Integer.toString(++flow_counter));
+						"FR_" + Integer.toString(++flow_counter),32,32,32767,true);
 
 //                generateFlow(null, null,
 //                        ip_mac.get(flow.getDestination().toString()),
@@ -228,41 +228,54 @@ public class Network implements IFloodlightModule, IOFMessageListener {
 	public static void generateFlow(String srcIp, String dstIp,
 									String srcMac, String dstMac,
 									int srcport, String dstport, DatapathId dpid,
-									String flowName) {
-//        log.debug(srcIp + "-" + dstIp + "-" + srcMac + "-" + dstMac);
+									String flowName,int srcipMask,int dstipMask,int priority,boolean is_in_port) {
+ //       log.debug(srcIp + "-" + dstIp + "-" + srcMac + "-" + dstMac);
 		String fmJson = new String();
-		int srcipMask = 32;
-		int dstipMask = 32;
+//		int srcipMask = 32;
+//		int dstipMask = 32;
+//		int priority=32767;
+//        if(srcIp.equals("10.0.0.1")&&dstIp.equals("10.0.0.2")){
+//			srcipMask = 24;
+//			dstipMask = 24;
+//		}
 		Map<String, Object> rowValues;
-		if (srcIp == null && dstIp == null) {
-			fmJson = "{\"switch\":\"" + dpid.toString()
-					+ "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
-					+ "\", \"priority\":\"32767"
-					+ "\", \"eth_src\":\"" + srcMac
-					+ "\", \"eth_dst\":\"" + dstMac
-					+ "\", \"in_port\":\"" + srcport
-					+ "\", \"active\":\"true"
-					+ "\", \"idle_timeout\":\"0" + "\", \"table\":\"0"
-					+ "\", \"eth_type\":\"2054"
-					+ "\", \"actions\":\"" + "output=" + dstport + "\"}";
-		} else {
-			fmJson = "{\"switch\":\"" + dpid.toString()
-					+ "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
-					+ "\", \"priority\":\"32767"
-					+ "\", \"ipv4_src\":\"" + srcIp + "/" + srcipMask
-					+ "\", \"ipv4_dst\":\"" + dstIp + "/" + dstipMask
+        if(is_in_port){
+            fmJson = "{\"switch\":\"" + dpid.toString()
+                    + "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
+                    // + "\", \"priority\":\"32767"
+                    + "\", \"priority\":\"" + priority
+                    + "\", \"ipv4_src\":\"" + srcIp + "/" + srcipMask
+                    + "\", \"ipv4_dst\":\"" + dstIp + "/" + dstipMask
 //                    + "\", \"eth_src\":\"" + srcMac
 //                    + "\", \"eth_dst\":\"" + dstMac
 					+ "\", \"in_port\":\"" + srcport
-					+ "\", \"active\":\"true"
-					+ "\", \"idle_timeout\":\"0" + "\", \"table\":\"0"
-					+ "\", \"eth_type\":\"2048"
-					+ "\", \"actions\":\"" + "output=" + dstport + "\"}";
-		}
+                    + "\", \"active\":\"true"
+                    + "\", \"idle_timeout\":\"0" + "\", \"table\":\"0"
+                    + "\", \"eth_type\":\"2048"
+                    + "\", \"actions\":\"" + "output=" + dstport + "\"}";
+        }
+        else{
+            fmJson = "{\"switch\":\"" + dpid.toString()
+                    + "\", \"name\":\"" + flowName + "\", \"cookie\":\"0"
+                    // + "\", \"priority\":\"32767"
+                    + "\", \"priority\":\"" + priority
+
+                    + "\", \"ipv4_src\":\"" + srcIp + "/" + srcipMask
+                    + "\", \"ipv4_dst\":\"" + dstIp + "/" + dstipMask
+//                    + "\", \"eth_src\":\"" + srcMac
+//                    + "\", \"eth_dst\":\"" + dstMac
+//					+ "\", \"in_port\":\"" + srcport
+                    + "\", \"active\":\"true"
+                    + "\", \"idle_timeout\":\"0" + "\", \"table\":\"0"
+                    + "\", \"eth_type\":\"2048"
+                    + "\", \"actions\":\"" + "output=" + dstport + "\"}";
+        }
+
 
 		// + "\", \"ip_proto\":\"" + rule.nw_proto
 //                + "\", \"instruction_goto_table\":\"1"
 		try {
+			//log.info("fmJson:"+fmJson.toString());
 			rowValues = StaticFlowEntries.jsonToStorageEntry(fmJson);
 			check(rowValues);
 			log.warn("$ Install rule:" + fmJson.toString());
@@ -352,16 +365,16 @@ public class Network implements IFloodlightModule, IOFMessageListener {
 			SwitchPort switchPort = host.getAttachmentPoints()[0];
 			if (topologyService.isEdge(switchPort.getSwitchDPID(), switchPort.getPort())) {
 				temp.add(switchPort2port(switchPort));
-//                IPv4Address[] ips = host.getIPv4Addresses();
-//                if (ips.length != 0) {
-//                    there is arp
-//                    host_edgeport.put(IPv4.fromIPv4Address(ips[0].getInt()),
-//                            switchPort2port(switchPort));
-//                }
+                IPv4Address[] ips = host.getIPv4Addresses();
+                if (ips.length != 0) {
+                    //there is arp
+                    host_edgeport.put(IPv4.fromIPv4Address(ips[0].getInt()),
+                            switchPort2port(switchPort));
+                }
 			}
 			// there's no arp
-			host_edgeport.put("10.0.0." +
-					host.getMACAddress().getLong(), switchPort2port(switchPort));
+//			host_edgeport.put("10.0.0." +
+//					host.getMACAddress().getLong(), switchPort2port(switchPort));
 		}
 
 		edge_ports = new ArrayList<>(temp);

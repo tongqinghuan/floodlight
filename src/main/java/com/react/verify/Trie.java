@@ -18,16 +18,19 @@ public class Trie {
 
     public void addFlowRule(EcFiled ecFiled,String switchId) {
 //		for(Flow entry:flowSet) {
-        char[] flow = ecFiled.getDst_ip().toCharArray();
+        String srcIP=ecFiled.getSrc_ip();
+        String dstIP=ecFiled.getDst_ip();
+        String srcAndDst=srcIP+dstIP;
+        char[] srcAndDstArr = srcAndDst.toCharArray();
         Node currentNode = root;
-        for (int i = 0; i < flow.length; i++) {
+        for (int i = 0; i < srcAndDstArr.length; i++) {
             //System.out.println(currentNode.containsChild(flow[i]));
-            if (!(currentNode.containsChild(flow[i]))) {
+            if (!(currentNode.containsChild(srcAndDstArr[i]))) {
 //				assign(1=49,0=48,x=120) and add child node
-                currentNode.addChild(flow[i], new Node(currentNode.toString() + flow[i]));
+                currentNode.addChild(srcAndDstArr[i], new Node(currentNode.toString() + srcAndDstArr[i]));
             }
 //				point shift down
-            currentNode = currentNode.getChild(flow[i]);
+            currentNode = currentNode.getChild(srcAndDstArr[i]);
         }
 //			set the last node as leaf node
         currentNode.setIsFlow(true);
@@ -44,7 +47,11 @@ public class Trie {
     }
 
     public boolean containFlowRule(EcFiled argString) {
-        Node node = getLeafNode(argString.getDst_ip());
+        String srcIP=argString.getSrc_ip();
+        String dstIP=argString.getDst_ip();
+        String srcAndDst=srcIP+dstIP;
+
+        Node node = getLeafNode(srcAndDst);
         if (node != null && node.isFlow()) {
             return true;
         } else {
@@ -53,37 +60,42 @@ public class Trie {
     }
 
     public void deleteFlowRule(EcFiled ecFiled) {
-        char[] filed = ecFiled.getDst_ip().toCharArray();
+        String srcIP=ecFiled.getSrc_ip();
+        String dstIP=ecFiled.getDst_ip();
+        String srcAndDst=srcIP+dstIP;
+        char[] srcAndDstArr = srcAndDst.toCharArray();
         Node currentNode = root;
-        for (int i = 0; i < filed.length && currentNode != null; i++) {
-            currentNode = currentNode.getChild(filed[i]);
+        for (int i = 0; i < srcAndDstArr.length && currentNode != null; i++) {
+            currentNode = currentNode.getChild(srcAndDstArr[i]);
         }
         currentNode.setIsFlow(false);
     }
     public HashSet<EcFiled> searchConflictFlowRule(EcFiled currentFlowRule) {
-
+        String srcIP=currentFlowRule.getSrc_ip();
+        String dstIP=currentFlowRule.getDst_ip();
+        String srcAndDst=srcIP+dstIP;
         HashSet<EcFiled> conflictFlowRules = new HashSet<EcFiled>();
         HashSet<Node> currentNodeSet = new HashSet<Node>();
         HashSet<Node> temp = new HashSet<Node>();
 //		 point to the root of the trie Tree, like a pointer
         currentNodeSet.add(root);
-        char[] flow = currentFlowRule.dst_ip.toCharArray();
+        char[] srcAndDstArr = srcAndDst.toCharArray();
 
-        for (int i = 0; i < currentFlowRule.dst_ip.length() && currentNodeSet != null; i++) {
+        for (int i = 0; i < srcAndDst.length() && currentNodeSet != null; i++) {
 //		 	each character of flow maps a tier of tree
             ArrayList branches = new ArrayList();
 
-            if (flow[i] == '0') {
+            if (srcAndDstArr[i] == '0') {
                 branches.add('0');
                 branches.add('x');//overlay section in the tree
             }
 
-            if (flow[i] == '1') {
+            if (srcAndDstArr[i] == '1') {
                 branches.add('1');
                 branches.add('x');
             }
 
-            if (flow[i] == 'x') {
+            if (srcAndDstArr[i] == 'x') {
                 branches.add('0');
                 branches.add('1');
                 branches.add('x');
@@ -115,7 +127,8 @@ public class Trie {
         for (Node node : currentNodeSet) {
 //		 	IsLeafNode
             if (node.isFlow()) {
-                conflictFlowRules.add(new EcFiled(node.toString()));
+                String ecFiledStr=new String(node.toString());
+                conflictFlowRules.add(new EcFiled(ecFiledStr.substring(0,32),ecFiledStr.substring(32,64)));
             }
         }
         return conflictFlowRules;

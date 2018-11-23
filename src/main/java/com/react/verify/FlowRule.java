@@ -1,46 +1,40 @@
 package com.react.verify;
 
 public class FlowRule{
+    String src_ip;
+    String dst_ip;
     String dpid;
     int priority;
     FlowRuleAction action;
 
-    public String getDpid() {
-        return dpid;
+    public FlowRule(String src_ip, String dst_ip, String dpid, int priority, FlowRuleAction action) {
+        this.src_ip = src_ip;
+        this.dst_ip = dst_ip;
+        this.dpid = dpid;
+        this.priority = priority;
+        this.action = action;
     }
 
-    public void setDpid(String dpid) {
-        this.dpid = dpid;
+    public String getDpid() {
+        return dpid;
     }
 
     public int getPriority() {
         return priority;
     }
 
-    public void setPriority(int priority) {
-        this.priority = priority;
-    }
-
     public FlowRuleAction getAction() {
         return action;
     }
 
-    public void setAction(FlowRuleAction action) {
-        this.action = action;
-    }
-
-    public FlowRule(String dpid, int priority, FlowRuleAction action) {
-        this.dpid = dpid;
-        this.priority = priority;
-        this.action = action;
-    }
-
     @Override
     public String toString() {
-        return "FlowRule{" +
-                "dpid='" + dpid + '\'' +
+        return
+                "src_ip='" + src_ip + '\'' +
+                ", dst_ip='" + dst_ip + '\'' +
+                ", dpid='" + dpid + '\'' +
                 ", priority=" + priority +
-                ", action=" + action +
-                '}';
+                ", action=" + action 
+                ;
     }
 }

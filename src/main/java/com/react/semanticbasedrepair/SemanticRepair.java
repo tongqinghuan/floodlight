@@ -1,6 +1,6 @@
 
 
-package com.react.com.react.semanticbasedrepair;
+package com.react.semanticbasedrepair;
 
 import com.react.compiler.Annotation;
 import com.react.compiler.Constraint;

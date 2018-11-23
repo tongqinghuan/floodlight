@@ -3,6 +3,7 @@ package com.react.verify;
 import com.react.compiler.Flow;
 import com.react.compiler.Instruction;
 import com.react.compiler.MiniCompiler;
+import com.react.compiler.VerifyTestData;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -20,23 +21,32 @@ public class VerifyAndRepairThread implements Callable<List<Instruction>> {
     }
     @Override
     public List<Instruction> call() throws Exception {
+
         List<Instruction> res = new ArrayList<>();
         HashSet<EcFiled> conflictEcfiled;
         HashSet<EC> ecsForCurrentFlowMod;
-        HashMap<EC, HashSet<EcFiled>> matchedEcfiledForEc;
+        HashMap<EC, HashSet<FlowRule>> matchedEcFlowRule;
         HashMap<EC, HashSet<Flow>> matchedEcFlow = null;
         //search conflict rule on trie
+        log.warn("---VerifyAndRepairThread is calculating conflict flow ruls---");
         conflictEcfiled = FlowModIntersepting.trie.searchConflictFlowRule(currentEcFiled);
-        //generate ecs
-        ecsForCurrentFlowMod = ECOperations.getEC(conflictEcfiled, currentEcFiled);
+ //       log.info("conflict ecFiled is as listed:");
+//        for(EcFiled ecFiled:conflictEcfiled){
+//            log.info(ecFiled.toString());
+//        }
+//        generate ecs
+        log.info("---VerifyAndRepairThread is calculating ecs---");
+        ecsForCurrentFlowMod = ECOperations.getEcForMutidimension(conflictEcfiled, currentEcFiled);
         log.info("ecsForCurrentFlowMod:" + ecsForCurrentFlowMod.toString());
-        //construct forwarding graph
-        matchedEcfiledForEc = ECOperations.generate_ecmatchedecFiled(ecsForCurrentFlowMod, conflictEcfiled);
-        log.info("matchedEcfiledForEc:" + matchedEcfiledForEc.toString());
+//        construct forwarding graph
+        log.info("---VerifyAndRepairThread is calculating matched flow rules---");
+        matchedEcFlowRule = ECOperations.generate_ecmatchedecFiled(ecsForCurrentFlowMod, conflictEcfiled);
+       // log.info("matchedEcfiledForEc:" + matchedEcFlowRule.toString());
         if (MiniCompiler.flows != null) {
-            matchedEcFlow = ECOperations.generate_ecmatchedFlow(ecsForCurrentFlowMod, MiniCompiler.flows);
+           // matchedEcFlow = ECOperations.generate_ecmatchedFlow(ecsForCurrentFlowMod, MiniCompiler.flows);
+            matchedEcFlow = ECOperations.generate_ecmatchedFlow(ecsForCurrentFlowMod, VerifyTestData.flows);
         }
-        log.info("matchedEcFlow:" + matchedEcFlow.toString());
+       // log.info("matchedEcFlow:" + matchedEcFlow.toString());
         return res;
     }
 

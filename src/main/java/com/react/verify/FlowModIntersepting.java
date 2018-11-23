@@ -31,6 +31,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import com.react.Utils.*;
 
 public class FlowModIntersepting implements IFloodlightModule,
         IOFMessageListener, IOFSwitchListener, IStorageSourceListener {
@@ -150,6 +151,7 @@ public class FlowModIntersepting implements IFloodlightModule,
     public static Trie trie;
     public static HashMap<EcFiled,FlowRule>  ecfiledFlowRulePair;
     public static EcFiled currentEcFiled;
+    public static int counter=0;
     @Override
     public String getName() {
         // TODO Auto-generated method stub
@@ -380,41 +382,20 @@ public class FlowModIntersepting implements IFloodlightModule,
 
 
     }
-
-    /**
-     * generate IPwithNetmask
-     *
-     * @param ipAddress
-     * @param masklength
-     * @return String IPwithNetmask
-     */
-    public  String ipInt2String(int ipAddress, int masklength) {
-        StringBuffer stringBuffer = new StringBuffer();
-        int i = 0;
-        for (; i < 31 - Integer.toBinaryString(ipAddress).length(); i++) {
-            stringBuffer.append("0");
-        }
-        stringBuffer.append(Integer.toBinaryString(ipAddress));
-        stringBuffer.delete(masklength - 1, 32);
-        while (stringBuffer.length() != 31) {
-            stringBuffer.append('x');
-        }
-        return stringBuffer.toString();
-    }
     public void constructTrieForFlowModDelete(OFFlowMod delete){
         EcFiled ecFiled=null;
         if (delete != null && delete.getMatch() != null) {
             if (delete.getMatch().get(MatchField.IPV4_DST) != null) {
                 String dst_ip;
                 if (!delete.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
-                    dst_ip = ipInt2String(
+                    dst_ip = IpConvertion.ipIntToString(
                             delete.getMatch().get(MatchField.IPV4_DST).getInt(), getMaskLength(delete.getMatch().getMasked(MatchField.IPV4_DST).getMask().toString()));
                     log.info("dst_ip:" + dst_ip);
                 } else {
-                    dst_ip = ipInt2String(delete.getMatch().get(MatchField.IPV4_DST).getInt(),
+                    dst_ip = IpConvertion.ipIntToString(delete.getMatch().get(MatchField.IPV4_DST).getInt(),
                             delete.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
                 }
-                ecFiled=new EcFiled(dst_ip);
+               // ecFiled=new EcFiled(srdst_ip);
                 if(delete.getCommand().equals(OFFlowModCommand.DELETE)||delete.getCommand().equals(OFFlowModCommand.DELETE_STRICT)){
                     ecfiledFlowRulePair.remove(ecFiled);
                     trie.deleteFlowRule(ecFiled);
@@ -430,20 +411,49 @@ public class FlowModIntersepting implements IFloodlightModule,
         EcFiled ecFiled=null;
         FlowRuleAction action=null;
         if (flowMod != null && flowMod.getMatch() != null) {
-            String dst_ip;
-            if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
-
+            if (flowMod.getMatch().get(MatchField.IPV4_DST) != null
+                &&flowMod.getMatch().get(MatchField.IPV4_SRC) !=null) {
+                String src_ip=null;
+                String dst_ip=null;
+                int src;
+                int dst;
+                int src_mask;
+                int dst_mask;
                 if (flowMod != null && flowMod.getMatch() != null) {
-                    if (flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
-                        if (!flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
-                            dst_ip = ipInt2String(
-                                    flowMod.getMatch().get(MatchField.IPV4_DST).getInt(), 32);
+                    if (flowMod.getMatch().get(MatchField.IPV4_SRC) != null
+                        &&flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
+
+                        if (flowMod.getMatch().get(MatchField.IPV4_SRC).isCidrMask()) {
+                           // log.warn("not supported mask");
+                            src=flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
+                            src_mask=32;
+                            src_ip = IpConvertion.ipIntToString(
+                                   src , src_mask);
                         } else {
-                            dst_ip = ipInt2String(flowMod.getMatch().get(MatchField.IPV4_DST).getInt(),
-                                    flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                           // log.warn(" supported mask");
+                            src=flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
+                            src_mask=flowMod.getMatch().getMasked(MatchField.IPV4_SRC)
+                                    .getMask().asCidrMaskLength();
+                            src_ip = IpConvertion.ipIntToString(src,src_mask);
+                          //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                        }
+                        if (flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                            // log.warn("not supported mask");
+                            dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
+                            dst_mask=32;
+                            dst_ip = IpConvertion.ipIntToString(
+                                    dst , dst_mask);
+                        } else {
+                            // log.warn(" supported mask");
+                            dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
+                            dst_mask=flowMod.getMatch().getMasked(MatchField.IPV4_DST)
+                                    .getMask().asCidrMaskLength();
+                            dst_ip = IpConvertion.ipIntToString(dst,dst_mask);
+                            //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
                         }
                         int priority=flowMod.getPriority();
-                        ecFiled=new EcFiled(dst_ip);
+                       // log.warn("ecFiledDstIP:"+dst_ip);
+                        ecFiled=new EcFiled(src_ip,dst_ip);
                         //extract actions from flow_mod
                         List<OFAction> actions = flowMod.getActions();
                         for (OFAction a : actions) {
@@ -455,7 +465,10 @@ public class FlowModIntersepting implements IFloodlightModule,
                                     break;
                             }
                         }
-                        FlowRule flowRule=new FlowRule(Long.toString(id.getLong()),priority,action);
+
+                        FlowRule flowRule=new FlowRule(IpConvertion.numToIpString(src,src_mask),
+                                IpConvertion.numToIpString(dst,dst_mask),
+                                Long.toString(id.getLong()),priority,action);
                         if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
                                 flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
                                 flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
@@ -471,6 +484,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                             }
                             trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
                             currentEcFiled=ecFiled;
+                            counter++;
 
                         }
 
@@ -533,6 +547,7 @@ public class FlowModIntersepting implements IFloodlightModule,
 
                         } else {
                             constructTrieForFlowModUpdate(oldFlowMod,DatapathId.of(dpidOldFlowMod));
+
                             constructTrieForFlowModUpdate(FlowModUtils.toFlowAdd(newFlowMod),DatapathId.of(dpid));
 
                         }
@@ -557,13 +572,17 @@ public class FlowModIntersepting implements IFloodlightModule,
                // log.info("flowmod message");
                // log.info(temp_flow_mod.toString());
                 constructTrieForFlowModUpdate(temp_flow_mod,DatapathId.of(dpid));
+
             }
-            log.info("---System is creating task to do verifying and repairing---");
+            //log.info("---System is creating task to do verifying and repairing---");
             if(verifyAndRepair==null){
                 verifyAndRepair= Executors.newCachedThreadPool();
             }
-            Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
-            repairedRes.add(res);
+            if(counter==14){
+                log.debug("System is verifying for currentEcFiled:"+currentEcFiled.toString());
+                Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
+                repairedRes.add(res);
+            }
         }
     }
     private void deleteStaticFlowEntry(String entryName) {

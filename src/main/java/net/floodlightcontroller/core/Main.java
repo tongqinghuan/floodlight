@@ -17,6 +17,7 @@
 package net.floodlightcontroller.core;
 
 import com.react.compiler.MiniCompiler;
+import com.react.compiler.VerifyTestData;
 import com.react.topo.Network;
 import net.floodlightcontroller.core.internal.CmdLineSettings;
 import net.floodlightcontroller.core.module.FloodlightModuleConfigFileNotFoundException;
@@ -51,7 +52,7 @@ public class Main {
 					// RPCServer.RPCServerRun();
 					logger.info("Thread is sleeping");
 					try {
-						TimeUnit.SECONDS.sleep(30);
+						TimeUnit.SECONDS.sleep(60);
 					} catch (InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
@@ -63,7 +64,8 @@ public class Main {
 					Network.printSwitch();
 					Network.printEdge_ports();
 					Network.printEdgeHosts();
-					MiniCompiler.installRules();
+					//MiniCompiler.installRules();
+					VerifyTestData.installFlowRulesForLoopTopo();
 
 				}
 			}).start();
