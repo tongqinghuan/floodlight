@@ -15,6 +15,14 @@ public class IpConvertion {
         }
         return stringBuffer.toString();
     }
+    public static  String portToBinaryStr(int port){
+        StringBuffer stringBuffer = new StringBuffer();
+        int i = 0;
+        for (; i < 32 - Integer.toBinaryString(port).length(); i++) {
+            stringBuffer.append("0");
+        }
+        return stringBuffer.toString();
+    }
     public static String ipToBinaryString(String ip){
         int num=0;
         String[] sections=ip.split("\\.");
@@ -23,9 +31,15 @@ public class IpConvertion {
             num+=(Integer.parseInt(str)<<(i*8));
             i--;
         }
-        return Integer.toBinaryString(num);
+        String res=Integer.toBinaryString(num);
+        int dif=32-res.length();
+        StringBuilder str=new StringBuilder();
+        for(int k=0;k<dif;k++){
+           str.append("0");
+        }
+        return str.toString()+res;
     }
-    private static int binaryStrToInt(String binaryStr){
+    public static int binaryStrToInt(String binaryStr){
         char[] str=binaryStr.toCharArray();
         int length=str.length;
         int res=0;
@@ -60,4 +74,8 @@ public class IpConvertion {
         }
         return sb.toString()+"\\"+maskLength;
     }
+//    public static void main(String[] args){
+//        String ip="10.0.0.1";
+//        System.out.println(ipToBinaryString(ip));
+//    }
 }

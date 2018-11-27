@@ -35,8 +35,8 @@ public class OneDimensionalEc {
     }
     @Override
     public String toString() {
-        return  IpConvertion.binaryStrToIpString(start) + '\'' +
-                IpConvertion.binaryStrToIpString(end) + '\'' ;
+        return  '\''+IpConvertion.binaryStrToIpString(start) + '\'' +
+                ","+'\''+IpConvertion.binaryStrToIpString(end) + '\'' ;
     }
 
 }

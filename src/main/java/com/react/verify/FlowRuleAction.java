@@ -19,7 +19,7 @@ class FlowRuleAction{
     }
     @Override
     public String toString() {
-        return "FlowRuleAction{" +
+        return "{" +
                 "action='" + action + '\'' +
                 ", port=" + port +
                 '}';

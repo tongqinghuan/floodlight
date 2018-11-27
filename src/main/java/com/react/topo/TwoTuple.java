@@ -39,7 +39,7 @@ public class TwoTuple<T>{
 
 	@Override
 	public String toString() {
-		return "TwoTuple [first=" + first + ", second=" + second + "]";
+		return " {srcnode=" + first + ", dstnode=" + second + "}";
 	}
 
 }

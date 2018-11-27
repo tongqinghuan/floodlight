@@ -19,6 +19,7 @@ import net.floodlightcontroller.util.MatchUtils;
 import org.projectfloodlight.openflow.protocol.*;
 import org.projectfloodlight.openflow.protocol.action.OFAction;
 import org.projectfloodlight.openflow.protocol.action.OFActionOutput;
+import org.projectfloodlight.openflow.protocol.match.Match;
 import org.projectfloodlight.openflow.protocol.match.MatchField;
 import org.projectfloodlight.openflow.types.DatapathId;
 import org.projectfloodlight.openflow.types.TableId;
@@ -147,9 +148,9 @@ public class FlowModIntersepting implements IFloodlightModule,
     protected Map<String, String> entry2dpid;
 
     public static ExecutorService verifyAndRepair;
-    public static ArrayList<Future<List<Instruction>>> repairedRes=new ArrayList<>();
+    public static ArrayList<Future<HashMap<EC,HashSet<VerifyResult>>>> repairedRes=new ArrayList<>();
     public static Trie trie;
-    public static HashMap<EcFiled,FlowRule>  ecfiledFlowRulePair;
+    public static HashMap<EcFiled,HashSet<FlowRule>>  ecfiledFlowRulePair;
     public static EcFiled currentEcFiled;
     public static int counter=0;
     @Override
@@ -397,7 +398,7 @@ public class FlowModIntersepting implements IFloodlightModule,
                 }
                // ecFiled=new EcFiled(srdst_ip);
                 if(delete.getCommand().equals(OFFlowModCommand.DELETE)||delete.getCommand().equals(OFFlowModCommand.DELETE_STRICT)){
-                    ecfiledFlowRulePair.remove(ecFiled);
+                    // ecfiledFlowRulePair.remove(ecFiled);
                     trie.deleteFlowRule(ecFiled);
                     currentEcFiled=ecFiled;
                 }
@@ -411,89 +412,113 @@ public class FlowModIntersepting implements IFloodlightModule,
         EcFiled ecFiled=null;
         FlowRuleAction action=null;
         if (flowMod != null && flowMod.getMatch() != null) {
-            if (flowMod.getMatch().get(MatchField.IPV4_DST) != null
-                &&flowMod.getMatch().get(MatchField.IPV4_SRC) !=null) {
-                String src_ip=null;
-                String dst_ip=null;
-                int src;
-                int dst;
-                int src_mask;
-                int dst_mask;
-                if (flowMod != null && flowMod.getMatch() != null) {
-                    if (flowMod.getMatch().get(MatchField.IPV4_SRC) != null
-                        &&flowMod.getMatch().get(MatchField.IPV4_DST) != null) {
-
-                        if (flowMod.getMatch().get(MatchField.IPV4_SRC).isCidrMask()) {
-                           // log.warn("not supported mask");
-                            src=flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
-                            src_mask=32;
-                            src_ip = IpConvertion.ipIntToString(
-                                   src , src_mask);
-                        } else {
-                           // log.warn(" supported mask");
-                            src=flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
-                            src_mask=flowMod.getMatch().getMasked(MatchField.IPV4_SRC)
-                                    .getMask().asCidrMaskLength();
-                            src_ip = IpConvertion.ipIntToString(src,src_mask);
-                          //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
-                        }
-                        if (flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
-                            // log.warn("not supported mask");
-                            dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
-                            dst_mask=32;
-                            dst_ip = IpConvertion.ipIntToString(
-                                    dst , dst_mask);
-                        } else {
-                            // log.warn(" supported mask");
-                            dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
-                            dst_mask=flowMod.getMatch().getMasked(MatchField.IPV4_DST)
-                                    .getMask().asCidrMaskLength();
-                            dst_ip = IpConvertion.ipIntToString(dst,dst_mask);
-                            //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
-                        }
-                        int priority=flowMod.getPriority();
-                       // log.warn("ecFiledDstIP:"+dst_ip);
-                        ecFiled=new EcFiled(src_ip,dst_ip);
-                        //extract actions from flow_mod
-                        List<OFAction> actions = flowMod.getActions();
-                        for (OFAction a : actions) {
-                            switch (a.getType()) {
-                                case OUTPUT:
-                                    action=new FlowRuleAction("forward",(((OFActionOutput) a).getPort().getPortNumber()));
-                                    break;
-                                case SET_FIELD:
-                                    break;
-                            }
-                        }
-
-                        FlowRule flowRule=new FlowRule(IpConvertion.numToIpString(src,src_mask),
-                                IpConvertion.numToIpString(dst,dst_mask),
-                                Long.toString(id.getLong()),priority,action);
-                        if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
-                                flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
-                                flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
-                            //store  action for constructing forwarding graph
-                            if(ecfiledFlowRulePair==null){
-                                ecfiledFlowRulePair=new HashMap<>();
-                            }
-                            ecfiledFlowRulePair.put(ecFiled,flowRule);
-                            //construct trie
-                            log.info("---System is constructing trie with updated flowmod---");
-                            if(trie==null){
-                                trie=new Trie();
-                            }
-                            trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
-                            currentEcFiled=ecFiled;
-                            counter++;
-
-                        }
-
-                    }
+            String src_ip=null;
+            String dst_ip=null;
+            String port=null;
+            int src;
+            int dst;
+            int in_port;
+            int src_mask;
+            int dst_mask;
+            int port_mask;
+            if (flowMod.getMatch().get(MatchField.IPV4_SRC) !=null) {
+                if (flowMod.getMatch().get(MatchField.IPV4_SRC).isCidrMask()) {
+                    // log.warn("not supported mask");
+                    src = flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
+                    src_mask = 32;
+                    src_ip = IpConvertion.ipIntToString(
+                            src, src_mask);
+                } else {
+                    // log.warn(" supported mask");
+                    src = flowMod.getMatch().get(MatchField.IPV4_SRC).getInt();
+                    src_mask = flowMod.getMatch().getMasked(MatchField.IPV4_SRC)
+                            .getMask().asCidrMaskLength();
+                    src_ip = IpConvertion.ipIntToString(src, src_mask);
+                    //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
                 }
+            }else{
+                src=0;
+                src_mask=0;
+                src_ip=IpConvertion.ipIntToString(src, src_mask);
+            }
+            if(flowMod.getMatch().get(MatchField.IPV4_DST)!=null){
+                if (flowMod.getMatch().get(MatchField.IPV4_DST).isCidrMask()) {
+                    // log.warn("not supported mask");
+                    dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
+                    dst_mask=32;
+                    dst_ip = IpConvertion.ipIntToString(
+                            dst , dst_mask);
+                } else {
+                    // log.warn(" supported mask");
+                    dst=flowMod.getMatch().get(MatchField.IPV4_DST).getInt();
+                    dst_mask=flowMod.getMatch().getMasked(MatchField.IPV4_DST)
+                            .getMask().asCidrMaskLength();
+                    dst_ip = IpConvertion.ipIntToString(dst,dst_mask);
+                    //  log.warn("maskLength:"+flowMod.getMatch().getMasked(MatchField.IPV4_DST).getMask().asCidrMaskLength());
+                }
+            }else {
+                dst=0;
+                dst_mask=0;
+                dst_ip=IpConvertion.ipIntToString(dst, dst_mask);
+
+            }
+            if(flowMod.getMatch().get(MatchField.IN_PORT)!=null){
+                in_port=flowMod.getMatch().get(MatchField.IN_PORT).getPortNumber();
+                port_mask=32;
+                port=IpConvertion.ipIntToString(in_port, port_mask);
+            }
+            else{
+                in_port=-1;
+                port_mask=0;
+                port=IpConvertion.ipIntToString(in_port, port_mask);
+            }
+            int priority=flowMod.getPriority();
+            //ecFiled binary
+            ecFiled=new EcFiled(src_ip,dst_ip,port);
+            //extract actions from flow_mod
+            List<OFAction> actions = flowMod.getActions();
+            for (OFAction a : actions) {
+                switch (a.getType()) {
+                    case OUTPUT:
+                        action=new FlowRuleAction("forward",(((OFActionOutput) a).getPort().getPortNumber()));
+                        break;
+                    case SET_FIELD:
+                        break;
+                }
+            }
+
+            FlowRule flowRule=new FlowRule(src,src_mask,
+                    dst,dst_mask,in_port,port_mask,
+                    Long.toString(id.getLong()),priority,action);
+            if (flowMod.getCommand().equals(OFFlowModCommand.ADD) ||
+                    flowMod.getCommand().equals(OFFlowModCommand.MODIFY) ||
+                    flowMod.getCommand().equals(OFFlowModCommand.MODIFY_STRICT)) {
+                //store  action for constructing forwarding graph
+                if(ecfiledFlowRulePair==null){
+                    ecfiledFlowRulePair=new HashMap<>();
+                }
+                if(ecfiledFlowRulePair.get(ecFiled)==null){
+                    HashSet<FlowRule> flowRules=new HashSet<>();
+                    flowRules.add(flowRule);
+                    ecfiledFlowRulePair.put(ecFiled,flowRules);
+                }else{
+                    ecfiledFlowRulePair.get(ecFiled).add(flowRule);
+                }
+                //construct trie
+                log.info("---System is constructing trie with updated flowmod---");
+                if(trie==null){
+                    trie=new Trie();
+                }
+                if(!trie.containFlowRule(ecFiled)){
+                    trie.addFlowRule(ecFiled,Long.toString(id.getLong()));
+                }
+                currentEcFiled=ecFiled;
+                counter++;
 
             }
 
             }
+
         }
 
     @Override
@@ -578,9 +603,9 @@ public class FlowModIntersepting implements IFloodlightModule,
             if(verifyAndRepair==null){
                 verifyAndRepair= Executors.newCachedThreadPool();
             }
-            if(counter==14){
+            if(counter==7){
                 log.debug("System is verifying for currentEcFiled:"+currentEcFiled.toString());
-                Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
+                Future<HashMap<EC,HashSet<VerifyResult>>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
                 repairedRes.add(res);
             }
         }
@@ -619,7 +644,7 @@ public class FlowModIntersepting implements IFloodlightModule,
             if(verifyAndRepair==null){
                 verifyAndRepair= Executors.newCachedThreadPool();
             }
-            Future<List<Instruction>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
+            Future<HashMap<EC,HashSet<VerifyResult>>> res=verifyAndRepair.submit(new VerifyAndRepairThread(currentEcFiled));
             repairedRes.add(res);
         }
     }

@@ -20,7 +20,8 @@ public class Trie {
 //		for(Flow entry:flowSet) {
         String srcIP=ecFiled.getSrc_ip();
         String dstIP=ecFiled.getDst_ip();
-        String srcAndDst=srcIP+dstIP;
+        String port=ecFiled.getIn_port();
+        String srcAndDst=srcIP+dstIP+port;
         char[] srcAndDstArr = srcAndDst.toCharArray();
         Node currentNode = root;
         for (int i = 0; i < srcAndDstArr.length; i++) {
@@ -34,7 +35,7 @@ public class Trie {
         }
 //			set the last node as leaf node
         currentNode.setIsFlow(true);
-        currentNode.setValue(switchId);
+
 //		}
     }
     public Node getLeafNode(String argString) {
@@ -49,7 +50,8 @@ public class Trie {
     public boolean containFlowRule(EcFiled argString) {
         String srcIP=argString.getSrc_ip();
         String dstIP=argString.getDst_ip();
-        String srcAndDst=srcIP+dstIP;
+        String port=argString.getIn_port();
+        String srcAndDst=srcIP+dstIP+port;
 
         Node node = getLeafNode(srcAndDst);
         if (node != null && node.isFlow()) {
@@ -62,7 +64,8 @@ public class Trie {
     public void deleteFlowRule(EcFiled ecFiled) {
         String srcIP=ecFiled.getSrc_ip();
         String dstIP=ecFiled.getDst_ip();
-        String srcAndDst=srcIP+dstIP;
+        String port=ecFiled.getIn_port();
+        String srcAndDst=srcIP+dstIP+port;
         char[] srcAndDstArr = srcAndDst.toCharArray();
         Node currentNode = root;
         for (int i = 0; i < srcAndDstArr.length && currentNode != null; i++) {
@@ -73,7 +76,8 @@ public class Trie {
     public HashSet<EcFiled> searchConflictFlowRule(EcFiled currentFlowRule) {
         String srcIP=currentFlowRule.getSrc_ip();
         String dstIP=currentFlowRule.getDst_ip();
-        String srcAndDst=srcIP+dstIP;
+        String port=currentFlowRule.getIn_port();
+        String srcAndDst=srcIP+dstIP+port;
         HashSet<EcFiled> conflictFlowRules = new HashSet<EcFiled>();
         HashSet<Node> currentNodeSet = new HashSet<Node>();
         HashSet<Node> temp = new HashSet<Node>();
@@ -128,7 +132,9 @@ public class Trie {
 //		 	IsLeafNode
             if (node.isFlow()) {
                 String ecFiledStr=new String(node.toString());
-                conflictFlowRules.add(new EcFiled(ecFiledStr.substring(0,32),ecFiledStr.substring(32,64)));
+                conflictFlowRules.add(new EcFiled(ecFiledStr.substring(0,32),
+                        ecFiledStr.substring(32,64),
+                        ecFiledStr.substring(64,96)));
             }
         }
         return conflictFlowRules;

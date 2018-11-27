@@ -1,12 +1,13 @@
 package com.react.topo;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 public class Node {
 
 	private  String flowStr;
-	private String switchId;
 	private Map children =new HashMap();
 	private boolean isValidFlow;
 	public Node(String argValue) {
@@ -34,12 +35,7 @@ public class Node {
 	public void setIsFlow(boolean bool) {
 		this.isValidFlow=bool;
 	}
-	public void setValue(String str_value) {
-		this.switchId=str_value;
-	}
-	public String getValue() {
-		return this.switchId;
-	}
+
 
 
 }
